@@ -84,6 +84,8 @@ nav.tabs button.on{color:var(--accent)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border-radius:999px;padding:6px 12px;background:var(--surface-2);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .chip.on{background:var(--accent);color:var(--accent-ink)}
+.chip.train{background:transparent;box-shadow:inset 0 0 0 1.5px var(--text-2)}
+.chip small{font-size:10px;color:var(--text-2);font-weight:700}
 .chip.best{outline:2px solid var(--accent);outline-offset:-2px}
 .seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
 .seg button{flex:1;padding:8px 6px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text-2)}
@@ -218,7 +220,7 @@ const pct=(a,b)=>b?Math.round(a/b*100)+' %':'–';
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 const sum=a=>a.reduce((x,y)=>x+y,0);
 
-function emptyDb(){return {v:1,halls:[],games:[],settings:{tapMode:'hit',lastHallId:null,lastBackup:null}}}
+function emptyDb(){return {v:1,halls:[],games:[],settings:{tapMode:'hit',lastHallId:null,lastBackup:null,lastType:'game'}}}
 let db;
 try{db=JSON.parse(localStorage.getItem(KEY))||emptyDb()}catch(e){db=emptyDb()}
 db.settings=Object.assign(emptyDb().settings,db.settings||{});db.halls=db.halls||[];db.games=db.games||[];
@@ -311,6 +313,10 @@ function racks(g){
 }
 
 /* ---------- Daten-Helfer ---------- */
+const typeOf=g=>g.type==='training'?'training':'game';
+const TYPE_LABEL={game:'Spiel',training:'Training'};
+const typeSeg=(cur,act)=>`<div class="seg" style="flex:1;max-width:240px"><button class="${cur==='game'?'on':''}" data-act="${act}" data-v="game">Spiel</button><button class="${cur==='training'?'on':''}" data-act="${act}" data-v="training">Training</button></div>`;
+const chipHtml=(g,best)=>`<button class="chip ${best?'best':''} ${typeOf(g)==='training'?'train':''}" data-act="game" data-id="${g.id}">${typeOf(g)==='training'?'<small>T</small> ':''}${gameScore(g)}${g.scoreOnly!=null?'*':''}</button>`;
 const hallById=id=>db.halls.find(h=>h.id===id);
 const hallName=id=>hallById(id)?.name||'Ohne Halle';
 const doneGames=()=>db.games.filter(g=>g.done);
@@ -356,7 +362,7 @@ function computeStats(games){
 
 /* ---------- UI-Grundgerüst ---------- */
 let tab='play',sel=new Set(),finishedId=null,startDate=todayStr();
-let statFilter={period:'all',hall:'all'};
+let statFilter={period:'all',hall:'all',type:'all'};
 let calMonth=todayStr().slice(0,7),openDay=null;
 const TITLES={play:'Spielen',history:'Verlauf',stats:'Statistik',more:'Mehr'};
 const chev='<svg class="chev" width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l6 6-6 6"/></svg>';
@@ -405,15 +411,16 @@ function renderStart(){
   let html=`<div class="card" style="padding:4px 14px">
     <button class="field" style="width:100%" data-act="pickHall"><span class="lbl">Halle</span><span class="val" style="${h?'':'color:var(--accent)'}">${h?esc(h.name):'Halle wählen'}</span>${chev}</button>
     <label class="field"><span class="lbl">Datum</span><input type="date" id="startDate" value="${startDate}" max="${todayStr()}"></label>
+    <div class="field"><span class="lbl">Art</span>${typeSeg(db.settings.lastType,'setType')}</div>
   </div>
   <div class="stack">
-    <button class="btn primary big" data-act="newGame">Neues Spiel starten</button>
+    <button class="btn primary big" data-act="newGame">${db.settings.lastType==='training'?'Training starten':'Neues Spiel starten'}</button>
     <button class="btn ghost" data-act="quickScore">Nur Endergebnis eintragen</button>
   </div>`;
   if(today){
     html+=`<div class="card" style="margin-top:14px"><h2>${startDate===todayStr()?'Heute':fmtDate(startDate)}<small>${today.count} ${today.count===1?'Spiel':'Spiele'}</small></h2>
       <div class="daystats" style="margin-top:0">${dayStatsHtml(today)}</div>
-      <div class="chips">${today.games.map(g=>`<button class="chip ${gameScore(g)===today.best&&today.count>1?'best':''}" data-act="game" data-id="${g.id}">${gameScore(g)}</button>`).join('')}</div></div>`;
+      <div class="chips">${today.games.map(g=>chipHtml(g,gameScore(g)===today.best&&today.count>1)).join('')}</div></div>`;
   }
   if(all.done.length){
     const last5=all.scores.slice(-5);
@@ -440,7 +447,7 @@ function renderGame(g){
   const count=mode==='hit'?sel.size:st.standing.length-sel.size;
   const fresh=st.fresh;
   document.body.classList.add('ingame');
-  let html=`<div class="gamebar"><div style="min-width:0"><div style="font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hallName(g.hallId))}</div><div class="hint">Spiel ${gameNoOfDay(g)}${g.date!==todayStr()?' · '+fmtDate(g.date):' · heute'} · <button data-act="abort" style="color:var(--danger);font-size:13px">Abbrechen</button></div></div><div class="total">${runningScore(g)}</div></div>
+  let html=`<div class="gamebar"><div style="min-width:0"><div style="font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hallName(g.hallId))}</div><div class="hint">${typeOf(g)==='training'?'<b>Training</b>':'Spiel'} ${gameNoOfDay(g)}${g.date!==todayStr()?' · '+fmtDate(g.date):' · heute'} · <button data-act="abort" style="color:var(--danger);font-size:13px">Abbrechen</button></div></div><div class="total">${runningScore(g)}</div></div>
   ${scorecardHtml(g,st.fi)}
   <div class="prompt"><div><b>Frame ${st.fi+1} · ${st.ri+1}. Wurf</b><div class="hint">${mode==='hit'?'Tippe die getroffenen Pins an':'Tippe die stehenden Pins an'}</div></div>
     <button class="btn small" data-act="undo" ${rollCount(g)?'':'disabled'}>↶ Zurück</button></div>
@@ -465,7 +472,7 @@ function renderFinished(g){
   const all=doneGames().map(gameScore);
   const isBest=score===Math.max(...all)&&all.length>1;
   $('#main').innerHTML=`<div class="card">
-    <div class="hint" style="text-align:center">${esc(hallName(g.hallId))} · Spiel ${gameNoOfDay(g)}</div>
+    <div class="hint" style="text-align:center">${esc(hallName(g.hallId))} · ${TYPE_LABEL[typeOf(g)]} ${gameNoOfDay(g)}</div>
     <div class="bigscore">${score}</div>
     <div style="text-align:center;margin-bottom:12px" class="sub">${isBest?'🏆 Neuer persönlicher Rekord!':'Punkte'}</div>
     ${scorecardHtml(g)}
@@ -475,13 +482,13 @@ function renderFinished(g){
       <div class="kpi"><b>${num(day?.avg)}</b><span>Ø heute (${day?.count||0})</span></div>
     </div></div>
   <div class="stack">
-    <button class="btn primary big" data-act="nextGame" data-id="${g.id}">Nächstes Spiel</button>
+    <button class="btn primary big" data-act="nextGame" data-id="${g.id}">${typeOf(g)==='training'?'Nächstes Training':'Nächstes Spiel'}</button>
     <button class="btn" data-act="doneFinished">Fertig</button>
     <button class="btn ghost" data-act="undoFinished" data-id="${g.id}">↶ Letzten Wurf korrigieren</button>
   </div>`;
 }
-function startGame(hallId,date){
-  const g={id:uid(),date:date||todayStr(),hallId:hallId||null,frames:[],done:false,created:Date.now()};
+function startGame(hallId,date,type){
+  const g={id:uid(),date:date||todayStr(),hallId:hallId||null,type:type||db.settings.lastType||'game',frames:[],done:false,created:Date.now()};
   db.games.push(g);if(hallId)db.settings.lastHallId=hallId;save();sel.clear();finishedId=null;tab='play';render();
 }
 function pickHall(onPick,currentId){
@@ -515,12 +522,13 @@ function quickScore(){
     <div class="card" style="padding:4px 14px;margin-top:10px">
       <div class="field"><span class="lbl">Halle</span><span class="val">${h?esc(h.name):'<span class="muted">bitte wählen</span>'}</span></div>
       <div class="field"><span class="lbl">Datum</span><span class="val">${fmtDate(startDate)}</span></div>
+      <div class="field"><span class="lbl">Art</span><span class="val">${TYPE_LABEL[db.settings.lastType]}</span></div>
     </div>
     <button class="btn primary big" id="qssave">Speichern</button>`,b=>{
     const inp=b.querySelector('#qs');setTimeout(()=>inp.focus(),250);
     b.querySelector('#qssave').onclick=()=>{
       const v=parseInt(inp.value,10);if(isNaN(v)||v<0||v>300){toast('Bitte 0 bis 300 eingeben');return}
-      const doSave=hid=>{db.games.push({id:uid(),date:startDate,hallId:hid,frames:[],done:true,scoreOnly:v,created:Date.now(),finished:Date.now()});db.settings.lastHallId=hid;save();closeSheet();toast('Spiel gespeichert');render()};
+      const doSave=hid=>{db.games.push({id:uid(),date:startDate,hallId:hid,type:db.settings.lastType,frames:[],done:true,scoreOnly:v,created:Date.now(),finished:Date.now()});db.settings.lastHallId=hid;save();closeSheet();toast('Spiel gespeichert');render()};
       if(h)doSave(h.id);else pickHall(doSave);
     };
   });
@@ -531,7 +539,7 @@ function showGame(id){
   const g=db.games.find(x=>x.id===id);if(!g)return;
   const s=computeStats([g]);
   const halls=hallsByUse();
-  openSheet(`<h3>${fmtDate(g.date)} · Spiel ${gameNoOfDay(g)}</h3>
+  openSheet(`<h3>${fmtDate(g.date)} · ${TYPE_LABEL[typeOf(g)]} ${gameNoOfDay(g)}</h3>
     <div class="bigscore" style="font-size:52px">${gameScore(g)??'–'}</div>
     <p class="hint" style="text-align:center;margin:4px 0 12px">${g.scoreOnly!=null?'Nur Endergebnis erfasst':'Punkte'}</p>
     ${g.scoreOnly==null?scorecardHtml(g)+`<div class="kpis" style="margin-top:10px">
@@ -541,6 +549,7 @@ function showGame(id){
     <div class="card" style="padding:4px 14px;margin-top:12px">
       <label class="field"><span class="lbl">Halle</span><select id="gh">${halls.map(h=>`<option value="${h.id}" ${h.id===g.hallId?'selected':''}>${esc(h.name)}</option>`).join('')}${g.hallId?'':'<option selected value="">Ohne Halle</option>'}</select></label>
       <label class="field"><span class="lbl">Datum</span><input type="date" id="gd" value="${g.date}" max="${todayStr()}"></label>
+      <div class="field"><span class="lbl">Art</span>${typeSeg(typeOf(g),'gameType" data-id="'+g.id)}</div>
     </div>
     <button class="btn danger" id="gdel">Spiel löschen</button>`,b=>{
     b.querySelector('#gh').onchange=e=>{g.hallId=e.target.value||null;save();render()};
@@ -579,9 +588,9 @@ function renderHistory(){
     <p class="hint" style="margin:10px 0 0;text-align:center">${monthDays.length?`${monthDays.length} Spieltage · ${mg.length} Spiele · Ø ${num(avg(mg.map(gameScore)))}`:'Keine Spiele in diesem Monat'}</p></div>`;
   html+=monthDays.map(d=>`<div class="card day ${openDay===d.date?'open':''}" id="day-${d.date}">
       <div class="row between"><b>${fmtDate(d.date,{weekday:'long',day:'numeric',month:'long'})}</b></div>
-      <div class="hint">${d.halls.map(esc).join(', ')}</div>
+      <div class="hint">${d.halls.map(esc).join(', ')}${d.games.some(g=>typeOf(g)==='training')?` · ${d.games.filter(g=>typeOf(g)==='training').length}× Training (T)`:''}</div>
       <div class="daystats">${dayStatsHtml(d)}</div>
-      <div class="chips">${d.games.map(g=>`<button class="chip ${gameScore(g)===d.best&&d.count>1?'best':''}" data-act="game" data-id="${g.id}">${gameScore(g)}${g.scoreOnly!=null?'*':''}</button>`).join('')}</div>
+      <div class="chips">${d.games.map(g=>chipHtml(g,gameScore(g)===d.best&&d.count>1)).join('')}</div>
     </div>`).join('');
   if(monthDays.some(d=>d.games.some(g=>g.scoreOnly!=null)))html+='<p class="hint">* nur Endergebnis erfasst. „Pins um“ zählt die tatsächlich umgeworfenen Pins der vollständig erfassten Spiele.</p>';
   $('#main').innerHTML=html;
@@ -593,6 +602,7 @@ let charts=[];
 function filteredGames(){
   let gs=doneGames();
   if(statFilter.hall!=='all')gs=gs.filter(g=>g.hallId===statFilter.hall);
+  if(statFilter.type!=='all')gs=gs.filter(g=>typeOf(g)===statFilter.type);
   const days={'30':30,'90':90,'365':365}[statFilter.period];
   if(days){const d=new Date();d.setDate(d.getDate()-days+1);const c=dstr(d);gs=gs.filter(g=>g.date>=c)}
   return gs;
@@ -602,6 +612,7 @@ function renderStats(){
   const halls=hallsByUse().filter(h=>h.count);
   const per=[['all','Alle'],['30','30 T'],['90','90 T'],['365','1 Jahr']];
   let html=`<div class="filters"><div class="seg">${per.map(([k,l])=>`<button class="${statFilter.period===k?'on':''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="seg" style="min-width:0;flex:1 1 100%">${[['all','Alles'],['game','Nur Spiele'],['training','Nur Training']].map(([k,l])=>`<button class="${statFilter.type===k?'on':''}" data-act="statType" data-v="${k}">${l}</button>`).join('')}</div>
     ${halls.length>1?`<select id="hallf"><option value="all">Alle Hallen</option>${halls.map(h=>`<option value="${h.id}" ${statFilter.hall===h.id?'selected':''}>${esc(h.name)}</option>`).join('')}</select>`:''}</div>`;
   const S=computeStats(filteredGames());
   if(!S.done.length){
@@ -632,7 +643,7 @@ function renderStats(){
     <div class="legend"><span><i style="background:var(--s1)"></i>Spiel</span><span><i class="line" style="background:var(--s2)"></i>Ø letzte 5 Spiele</span></div>
     <div class="chart" id="ch1"></div></div>`;
   charts.push(['ch1',{h:200,labels:S.done.map(g=>fmtShort(g.date)),series:[{kind:'dot',color:'var(--s1)',values:sc},{kind:'line',color:'var(--s2)',values:ma}],
-    tip:i=>`${fmtDate(S.done[i].date)}<br><b>${sc[i]}</b> Punkte${ma[i]!=null?' · Ø5 '+num(ma[i]):''}<br><span class="muted">${esc(hallName(S.done[i].hallId))}</span>`}]);
+    tip:i=>`${fmtDate(S.done[i].date)}<br><b>${sc[i]}</b> Punkte${ma[i]!=null?' · Ø5 '+num(ma[i]):''}<br><span class="muted">${TYPE_LABEL[typeOf(S.done[i])]} · ${esc(hallName(S.done[i].hallId))}</span>`}]);
 
   // Tagesschnitt
   const days=groupByDay(S.done).slice(-30);
@@ -670,6 +681,12 @@ function renderStats(){
   if(hm.size>1||statFilter.hall==='all'){
     html+=`<div class="card"><h2>Nach Halle</h2><table class="t"><tr><th>Halle</th><th class="n">Spiele</th><th class="n">Ø</th><th class="n">Bestes</th></tr>
       ${[...hm.entries()].sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>`<tr><td>${esc(hallName(k))}</td><td class="n">${v.length}</td><td class="n">${num(avg(v))}</td><td class="n">${Math.max(...v)}</td></tr>`).join('')}</table></div>`;
+  }
+  // Spiel vs. Training
+  if(statFilter.type==='all'){
+    const ty={game:[],training:[]};S.done.forEach(g=>ty[typeOf(g)].push(gameScore(g)));
+    if(ty.training.length&&ty.game.length)html+=`<div class="card"><h2>Spiel und Training</h2><table class="t"><tr><th>Art</th><th class="n">Spiele</th><th class="n">Ø</th><th class="n">Bestes</th></tr>
+      ${['game','training'].map(k=>`<tr><td>${TYPE_LABEL[k]}</td><td class="n">${ty[k].length}</td><td class="n">${num(avg(ty[k]))}</td><td class="n">${Math.max(...ty[k])}</td></tr>`).join('')}</table></div>`;
   }
   // Wochentage / Rhythmus
   const wd=[0,0,0,0,0,0,0];S.done.forEach(g=>wd[(toDate(g.date).getDay()+6)%7]++);
@@ -770,7 +787,7 @@ function renderMore(){
       <li>Ab dann nur noch über das Icon starten. Die App funktioniert auch ohne Internet.</li></ol>
       <p class="hint">Wichtig: Safari und die Home-Bildschirm-App haben getrennte Speicher. Spiele, die du vorher in Safari erfasst hast, holst du per Backup rüber.</p></div>
     <button class="btn danger" data-act="wipe">Alle Daten löschen</button>
-    <p class="hint" style="text-align:center">${db.games.length} Spiele gespeichert · Bowling Tracker 1.0</p>`;
+    <p class="hint" style="text-align:center">${db.games.length} Spiele gespeichert · Bowling Tracker 1.1</p>`;
   $('#importFile').onchange=importFile;
 }
 async function shareOrDownload(text,name,type){
@@ -786,9 +803,9 @@ async function exportBackup(){
   if(ok){db.settings.lastBackup=Date.now();save();render();toast('Backup erstellt')}
 }
 function exportCsv(){
-  const rows=[['Datum','Halle','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
+  const rows=[['Datum','Halle','Art','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
   sortedGames(doneGames()).forEach(g=>{const s=computeStats([g]);
-    rows.push([g.date,hallName(g.hallId),gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
+    rows.push([g.date,hallName(g.hallId),TYPE_LABEL[typeOf(g)],gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
   const csv='﻿'+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n');
   shareOrDownload(csv,'bowling-spiele-'+todayStr()+'.csv','text/csv');
 }
@@ -825,7 +842,10 @@ const actions={
   pickHall(){pickHall(id=>{db.settings.lastHallId=id;save();render()},db.settings.lastHallId)},
   newGame(){const h=hallById(db.settings.lastHallId);if(h)startGame(h.id,startDate);else pickHall(id=>startGame(id,startDate))},
   quickScore,
-  nextGame(el){const g=db.games.find(x=>x.id===el.dataset.id);startGame(g?.hallId,g?.date)},
+  nextGame(el){const g=db.games.find(x=>x.id===el.dataset.id);startGame(g?.hallId,g?.date,g&&typeOf(g))},
+  setType(el){db.settings.lastType=el.dataset.v;save();render()},
+  gameType(el){const g=db.games.find(x=>x.id===el.dataset.id);if(!g)return;g.type=el.dataset.v;save();el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));render()},
+  statType(el){statFilter.type=el.dataset.v;renderStats()},
   doneFinished(){finishedId=null;render()},
   undoFinished(el){const g=db.games.find(x=>x.id===el.dataset.id);if(g){undoRoll(g);finishedId=null;sel.clear();render()}},
   game(el){showGame(el.dataset.id)},
