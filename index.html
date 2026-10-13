@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bowling">
+<meta name="theme-color" content="#f4f4f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Bowling Tracker</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f4f2;--surface:#ffffff;--surface-2:#ecebe8;--text:#0b0b0b;--text-2:#52514e;--muted:#8a8984;
+  --border:#e0dfdb;--accent:#2a78d6;--accent-ink:#ffffff;--accent-soft:#dbe9fb;
+  --s1:#2a78d6;--s2:#eb6834;--danger:#c62828;--pin-ring:#d83a3a;--pin-face:#ffffff;--pin-edge:#cfcdc8;
+  --special:#1f2a37;--special-ink:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f0f0f;--surface:#1a1a19;--surface-2:#262624;--text:#f0efec;--text-2:#c3c2b7;--muted:#8d8c85;
+    --border:#2f2e2b;--accent:#3987e5;--accent-ink:#ffffff;--accent-soft:#16304f;
+    --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--pin-face:#f3f2ee;--pin-edge:#5a5955;
+    --special:#e9e7e1;--special-ink:#111111;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f0f0f;--surface:#1a1a19;--surface-2:#262624;--text:#f0efec;--text-2:#c3c2b7;--muted:#8d8c85;
+  --border:#2f2e2b;--accent:#3987e5;--accent-ink:#ffffff;--accent-soft:#16304f;
+  --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--pin-face:#f3f2ee;--pin-edge:#5a5955;
+  --special:#e9e7e1;--special-ink:#111111;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(env(safe-area-inset-top) + 10px) 16px 8px;
+  display:flex;align-items:center;justify-content:space-between}
+header.top h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+main{padding:4px 16px calc(96px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:var(--surface);border-top:1px solid var(--border);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);padding:4px 0}
+nav.tabs button svg{width:26px;height:26px}
+nav.tabs button.on{color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;margin:0 0 12px}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:650}
+.card h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+.muted{color:var(--muted)}.sub{color:var(--text-2)}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.field{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 2px;border-bottom:1px solid var(--border);min-height:52px}
+.field:last-child{border-bottom:0}
+.field .lbl{color:var(--text-2)}
+.field .val{font-weight:600;text-align:right;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field input[type=date],.field select{border:0;background:transparent;font-weight:600;text-align:right;min-height:32px}
+.chev{color:var(--muted);flex:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:14px;font-weight:650;font-size:17px;
+  background:var(--surface-2);color:var(--text);padding:0 14px;transition:transform .06s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.special{background:var(--special);color:var(--special-ink)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.danger{background:transparent;color:var(--danger)}
+.btn.big{min-height:64px;font-size:19px}
+.btn.small{min-height:40px;font-size:15px;width:auto;border-radius:10px}
+.btn[disabled]{opacity:.35;pointer-events:none}
+.stack>*+*{margin-top:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--surface-2);border-radius:12px;padding:10px}
+.kpi b{display:block;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--text-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;padding:6px 12px;background:var(--surface-2);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.chip.best{outline:2px solid var(--accent);outline-offset:-2px}
+.seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;padding:8px 6px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text-2)}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.filters{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.filters .seg{flex:1;min-width:230px}
+.filters select{background:var(--surface-2);border:0;border-radius:10px;padding:9px 10px;font-weight:600;font-size:14px;max-width:100%}
+
+/* Scorecard */
+.scorecard{display:grid;grid-template-columns:repeat(9,1fr) 1.45fr;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
+.fr{border-right:1px solid var(--border);min-width:0}
+.fr:last-child{border-right:0}
+.fr .no{font-size:10px;color:var(--muted);text-align:center;background:var(--surface-2);line-height:16px}
+.fr .boxes{display:flex;justify-content:flex-end;height:20px}
+.fr .boxes span{width:50%;max-width:16px;text-align:center;font-size:13px;font-weight:650;line-height:20px;border-left:1px solid var(--border);border-bottom:1px solid var(--border)}
+.fr.tenth .boxes span{width:33.33%;max-width:16px}
+.fr .boxes span.split{border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--danger)}
+.fr .tot{text-align:center;font-size:14px;font-weight:700;height:22px;line-height:22px;font-variant-numeric:tabular-nums}
+.fr.cur{background:var(--accent-soft)}
+
+/* Pin deck */
+.deck{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 4px;user-select:none;-webkit-user-select:none}
+.deck .prow{display:flex;gap:9px}
+.pin{width:min(15.5vw,62px);height:min(15.5vw,62px);border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff 0,var(--pin-face) 55%,#e4e2dc 100%);
+  box-shadow:inset 0 0 0 7px var(--pin-face),inset 0 0 0 11px var(--pin-ring),0 0 0 2px var(--pin-edge),0 2px 4px rgba(0,0,0,.18);
+  color:#222;font-weight:750;font-size:20px;display:flex;align-items:center;justify-content:center;transition:transform .08s, background .08s}
+.pin:active{transform:scale(.93)}
+.pin.on{background:var(--accent);color:#fff;box-shadow:0 0 0 3px var(--accent),0 2px 6px rgba(0,0,0,.25);transform:scale(.94)}
+.pin.down{background:transparent;box-shadow:inset 0 0 0 2px var(--border);color:var(--muted);pointer-events:none;opacity:.6}
+.prompt{display:flex;justify-content:space-between;align-items:center;margin:10px 2px 0}
+.prompt b{font-size:17px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.actions .wide{grid-column:1/-1}
+.gamebar{display:flex;justify-content:space-between;align-items:center;margin:0 2px 6px;gap:8px}
+body.ingame header.top{display:none}
+body.ingame main{padding-top:calc(env(safe-area-inset-top) + 10px)}
+.gamebar .total{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* sheet */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;
+  padding:8px 16px calc(20px + env(safe-area-inset-bottom));animation:up .2s}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--border);margin:4px auto 10px}
+.sheet h3{margin:0 0 12px;font-size:18px}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+@keyframes fade{from{opacity:0}}
+.search{width:100%;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 14px;font-size:17px;outline:none}
+.search:focus{border-color:var(--accent)}
+.list{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:10px}
+.list .item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:14px;border-bottom:1px solid var(--border);text-align:left;min-height:52px}
+.list .item:last-child{border-bottom:0}
+.list .item.add{color:var(--accent);font-weight:650}
+.list .item.sel{background:var(--accent-soft)}
+
+/* charts */
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart .tip{position:absolute;top:0;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);white-space:nowrap;display:none;z-index:2}
+.chart .tip b{font-size:14px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text-2);margin:-2px 0 6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.legend i.line{width:16px;height:3px;border-radius:2px;vertical-align:3px}
+.axis text{fill:var(--muted);font-size:11px}
+.grid line{stroke:var(--border)}
+.trend{font-size:14px;color:var(--text-2);margin:0 0 8px}
+.trend b{color:var(--text)}
+
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .wd{font-size:11px;color:var(--muted);padding-bottom:2px}
+.cal .d{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:14px;position:relative;font-variant-numeric:tabular-nums}
+.cal .d.has{font-weight:700}
+.cal .d.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal .d small{font-size:10px;line-height:1;font-weight:600;opacity:.9}
+.day{cursor:pointer}
+.day.open{box-shadow:0 0 0 2px var(--accent)}
+.daystats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.daystats div{background:var(--surface-2);border-radius:10px;padding:7px 4px;text-align:center}
+.daystats b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.daystats span{font-size:11px;color:var(--text-2)}
+
+.pinmaps{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pinmaps figure{margin:0;text-align:center}
+.pinmaps figcaption{font-size:12px;color:var(--text-2);margin-top:4px}
+.leave{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.leave:last-child{border-bottom:0}
+.leave .nm{font-weight:650}
+.leave .bar{height:6px;border-radius:3px;background:var(--surface-2);margin-top:5px;overflow:hidden}
+.leave .bar i{display:block;height:100%;background:var(--s1);border-radius:3px}
+table.t{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+table.t th{text-align:left;font-weight:600;color:var(--text-2);font-size:12px;padding:4px 4px 6px}
+table.t td{padding:8px 4px;border-top:1px solid var(--border)}
+table.t td.n,table.t th.n{text-align:right}
+.empty{text-align:center;padding:30px 10px;color:var(--text-2)}
+.empty .big{font-size:44px}
+.bigscore{font-size:64px;font-weight:800;text-align:center;line-height:1;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--text);color:var(--bg);
+  padding:10px 16px;border-radius:12px;font-size:14px;z-index:100;animation:fade .2s;max-width:90vw}
+.hint{font-size:13px;color:var(--text-2)}
+ol.steps{margin:6px 0 0;padding-left:20px}ol.steps li{margin:4px 0}
+</style>
+</head>
+<body>
+<header class="top"><h1 id="title">Spielen</h1><span id="topright"></span></header>
+<main id="main"></main>
+<nav class="tabs" id="tabs">
+  <button data-tab="play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="10" cy="8.5" r="1.3" fill="currentColor"/><circle cx="14" cy="9.5" r="1.3" fill="currentColor"/><circle cx="11" cy="12.5" r="1.3" fill="currentColor"/></svg>Spielen</button>
+  <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Verlauf</button>
+  <button data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Statistik</button>
+  <button data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>Mehr</button>
+</nav>
+<script>
+'use strict';
+/* ---------- Grundlagen ---------- */
+const PINS=[1,2,3,4,5,6,7,8,9,10];
+const ROWS=[[7,8,9,10],[4,5,6],[2,3],[1]];
+const ADJ={1:[2,3],2:[1,3,4,5],3:[1,2,5,6],4:[2,5,7,8],5:[2,3,4,6,8,9],6:[3,5,9,10],7:[4,8],8:[4,5,7,9],9:[5,6,8,10],10:[6,9]};
+const SEQ=['#cde2fb','#b7d3f6','#9ec5f4','#86b6ef','#6da7ec','#5598e7','#3987e5','#2a78d6','#256abf','#1c5cab','#184f95','#104281','#0d366b'];
+const KEY='bowling-tracker-v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const dstr=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const todayStr=()=>dstr(new Date());
+const toDate=s=>new Date(s+'T12:00:00');
+const fmtDate=(s,o)=>toDate(s).toLocaleDateString('de-DE',o||{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+const fmtShort=s=>toDate(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+const num=(v,d=0)=>v==null||isNaN(v)?'–':v.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(a,b)=>b?Math.round(a/b*100)+' %':'–';
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const sum=a=>a.reduce((x,y)=>x+y,0);
+
+function emptyDb(){return {v:1,halls:[],games:[],settings:{tapMode:'hit',lastHallId:null,lastBackup:null}}}
+let db;
+try{db=JSON.parse(localStorage.getItem(KEY))||emptyDb()}catch(e){db=emptyDb()}
+db.settings=Object.assign(emptyDb().settings,db.settings||{});db.halls=db.halls||[];db.games=db.games||[];
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Speichern fehlgeschlagen')}}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+
+/* ---------- Spiellogik ---------- */
+function state(g){
+  const f=g.frames;
+  for(let i=0;i<9;i++){
+    const fr=f[i]||[];
+    if(!fr.length) return {fi:i,ri:0,standing:PINS.slice(),fresh:true};
+    if(fr.length===1&&fr[0].length<10) return {fi:i,ri:1,standing:PINS.filter(p=>!fr[0].includes(p)),fresh:false};
+  }
+  const t=f[9]||[];let rack=PINS.slice(),fresh=true;
+  for(const r of t){rack=rack.filter(p=>!r.includes(p));fresh=false;if(!rack.length){rack=PINS.slice();fresh=true}}
+  const n=t.length;
+  const done=n===3||(n===2&&!(t[0].length===10||t[0].length+t[1].length===10));
+  if(done) return {done:true};
+  return {fi:9,ri:n,standing:rack,fresh};
+}
+function addRoll(g,knocked){
+  const st=state(g);if(st.done)return;
+  (g.frames[st.fi]=g.frames[st.fi]||[]).push(knocked.slice().sort((a,b)=>a-b));
+  if(state(g).done){g.done=true;g.finished=Date.now()}
+  save();
+}
+function undoRoll(g){
+  for(let i=g.frames.length-1;i>=0;i--){
+    if(g.frames[i]&&g.frames[i].length){g.frames[i].pop();if(!g.frames[i].length)g.frames.length=i;g.done=false;delete g.finished;save();return true}
+  }
+  return false;
+}
+function rollCount(g){return g.frames.reduce((a,f)=>a+(f?f.length:0),0)}
+function frameScores(g){
+  const f=g.frames,rolls=[],start=[];
+  f.forEach((fr,i)=>{start[i]=rolls.length;(fr||[]).forEach(r=>rolls.push(r.length))});
+  const done=state(g).done;const out=[];let total=0,broken=false;
+  for(let i=0;i<10;i++){
+    const fr=f[i];let s=null;
+    if(fr&&fr.length&&!broken){
+      const k=start[i];
+      if(i<9){
+        if(fr[0].length===10){if(rolls[k+1]!=null&&rolls[k+2]!=null)s=10+rolls[k+1]+rolls[k+2]}
+        else if(fr.length===2){const b=fr[0].length+fr[1].length;if(b===10){if(rolls[k+2]!=null)s=10+rolls[k+2]}else s=b}
+      }else if(done) s=sum(fr.map(r=>r.length));
+    }
+    if(s==null){broken=true;out.push(null)}else{total+=s;out.push(total)}
+  }
+  return out;
+}
+function runningScore(g){const fs=frameScores(g).filter(v=>v!=null);return fs.length?fs[fs.length-1]:0}
+function gameScore(g){if(g.scoreOnly!=null)return g.scoreOnly;const fs=frameScores(g);return fs[9]}
+function pinsKnocked(g){return g.scoreOnly!=null?null:sum(g.frames.map(fr=>sum((fr||[]).map(r=>r.length))))}
+function isSplit(knocked){
+  if(!knocked.includes(1))return false;
+  const st=PINS.filter(p=>!knocked.includes(p));if(st.length<2)return false;
+  const seen=new Set([st[0]]),q=[st[0]];
+  while(q.length){const p=q.pop();for(const n of ADJ[p])if(st.includes(n)&&!seen.has(n)){seen.add(n);q.push(n)}}
+  return seen.size<st.length;
+}
+const sym=n=>n===0?'-':String(n);
+function marks(g,i){
+  const fr=g.frames[i]||[];
+  if(i<9){
+    const a=fr[0],b=fr[1];if(!a)return[{t:''},{t:''}];
+    if(a.length===10)return[{t:''},{t:'X'}];
+    return[{t:sym(a.length),split:isSplit(a)},{t:b?(a.length+b.length===10?'/':sym(b.length)):''}];
+  }
+  const out=[];let rack=10,fresh=true;
+  for(const r of fr){const n=r.length;
+    if(fresh&&n===10)out.push({t:'X'});else if(!fresh&&n===rack)out.push({t:'/'});else out.push({t:sym(n),split:fresh&&isSplit(r)});
+    rack-=n;fresh=false;if(rack===0){rack=10;fresh=true}}
+  while(out.length<3)out.push({t:''});
+  return out;
+}
+/* Jeder "Rack" = ein frisch aufgestelltes Pin-Dreieck: erster Wurf + ggf. Spare-Versuch */
+function racks(g){
+  const out=[];
+  g.frames.forEach((fr,i)=>{
+    if(!fr||!fr.length)return;
+    if(i<9){out.push({first:fr[0],second:fr[0].length<10?fr[1]:undefined});return}
+    let rack=PINS.slice(),fresh=true,cur=null;
+    for(const r of fr){
+      if(fresh){cur={first:r};out.push(cur)}else if(cur&&cur.second===undefined)cur.second=r;
+      rack=rack.filter(p=>!r.includes(p));fresh=false;if(!rack.length){rack=PINS.slice();fresh=true}
+    }
+  });
+  return out;
+}
+
+/* ---------- Daten-Helfer ---------- */
+const hallById=id=>db.halls.find(h=>h.id===id);
+const hallName=id=>hallById(id)?.name||'Ohne Halle';
+const doneGames=()=>db.games.filter(g=>g.done);
+const activeGame=()=>db.games.find(g=>!g.done&&g.scoreOnly==null);
+function sortedGames(list){return list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.created||0)-(b.created||0))}
+function hallsByUse(){
+  const last={},cnt={};
+  db.games.forEach(g=>{if(!g.hallId)return;cnt[g.hallId]=(cnt[g.hallId]||0)+1;if(!last[g.hallId]||g.date>last[g.hallId])last[g.hallId]=g.date});
+  return db.halls.map(h=>({...h,count:cnt[h.id]||0,last:last[h.id]||''})).sort((a,b)=>b.last.localeCompare(a.last)||a.name.localeCompare(b.name,'de'));
+}
+function groupByDay(games){
+  const m=new Map();
+  sortedGames(games).forEach(g=>{if(!m.has(g.date))m.set(g.date,[]);m.get(g.date).push(g)});
+  return [...m.entries()].map(([date,gs])=>{
+    const scores=gs.map(gameScore);const tracked=gs.filter(g=>g.scoreOnly==null);
+    return {date,games:gs,count:gs.length,avg:avg(scores),total:sum(scores),best:Math.max(...scores),
+      pins:tracked.length?sum(tracked.map(pinsKnocked)):null,halls:[...new Set(gs.map(g=>hallName(g.hallId)))]};
+  });
+}
+function computeStats(games){
+  const done=sortedGames(games.filter(g=>g.done));
+  const scores=done.map(gameScore);
+  const tracked=done.filter(g=>g.scoreOnly==null);
+  const R=[];tracked.forEach(g=>R.push(...racks(g)));
+  const strikes=R.filter(r=>r.first.length===10).length;
+  const opp=R.filter(r=>r.first.length<10&&r.second);
+  const conv=opp.filter(r=>r.first.length+r.second.length===10);
+  const stand={},left={};PINS.forEach(p=>{stand[p]=0;left[p]=0});
+  const leaves=new Map();let splits=0,splitConv=0,single=0,singleConv=0;
+  R.forEach(r=>{PINS.forEach(p=>{if(!r.first.includes(p))stand[p]++})});
+  opp.forEach(r=>{
+    const st=PINS.filter(p=>!r.first.includes(p));const key=st.join('-');
+    const ok=r.first.length+r.second.length===10;
+    const L=leaves.get(key)||{pins:st,n:0,ok:0};L.n++;if(ok)L.ok++;leaves.set(key,L);
+    if(isSplit(r.first)){splits++;if(ok)splitConv++}
+    if(st.length===1){single++;if(ok)singleConv++}
+    if(!ok)st.forEach(p=>{if(!r.second.includes(p))left[p]++});
+  });
+  const open=opp.length-conv.length;
+  return {done,scores,tracked,R,strikes,opp,conv,stand,left,leaves:[...leaves.values()].sort((a,b)=>b.n-a.n||a.pins.length-b.pins.length),
+    splits,splitConv,single,singleConv,open,firstAvg:avg(R.map(r=>r.first.length))};
+}
+
+/* ---------- UI-Grundgerüst ---------- */
+let tab='play',sel=new Set(),finishedId=null,startDate=todayStr();
+let statFilter={period:'all',hall:'all'};
+let calMonth=todayStr().slice(0,7),openDay=null;
+const TITLES={play:'Spielen',history:'Verlauf',stats:'Statistik',more:'Mehr'};
+const chev='<svg class="chev" width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l6 6-6 6"/></svg>';
+
+function render(){
+  $('#title').textContent=TITLES[tab];$('#topright').innerHTML='';document.body.classList.remove('ingame');
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  ({play:renderPlay,history:renderHistory,stats:renderStats,more:renderMore})[tab]();
+}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+function openSheet(html,onMount){
+  closeSheet();
+  const b=document.createElement('div');b.className='backdrop';b.id='sheet';
+  b.innerHTML='<div class="sheet"><div class="grab"></div>'+html+'</div>';
+  b.addEventListener('click',e=>{if(e.target===b)closeSheet()});
+  document.body.appendChild(b);onMount&&onMount(b);
+}
+function closeSheet(){const s=$('#sheet');if(s)s.remove()}
+function ask(msg,ok,danger){return new Promise(res=>{
+  openSheet(`<h3>${esc(msg)}</h3><div class="stack"><button class="btn big ${danger===false?'primary':'danger'}" id="askOk" style="${danger===false?'':'background:var(--surface-2)'}">${esc(ok||'Ja')}</button><button class="btn" id="askNo">Abbrechen</button></div>`,b=>{
+    b.querySelector('#askOk').onclick=()=>{closeSheet();res(true)};b.querySelector('#askNo').onclick=()=>{closeSheet();res(false)};
+    b.addEventListener('click',e=>{if(e.target===b)res(false)});
+  });
+})}
+function askText(title,val){return new Promise(res=>{
+  openSheet(`<h3>${esc(title)}</h3><input class="search" id="askT" value="${esc(val||'')}" autocomplete="off"><div class="stack" style="margin-top:10px"><button class="btn primary big" id="askOk">Speichern</button></div>`,b=>{
+    const i=b.querySelector('#askT');setTimeout(()=>i.focus(),250);
+    const go=()=>{closeSheet();res(i.value.trim()||null)};
+    b.querySelector('#askOk').onclick=go;i.onkeydown=e=>{if(e.key==='Enter')go()};
+    b.addEventListener('click',e=>{if(e.target===b)res(null)});
+  });
+})}
+
+/* ---------- Spielen ---------- */
+function renderPlay(){
+  const g=activeGame();
+  if(g)return renderGame(g);
+  const fg=finishedId&&db.games.find(x=>x.id===finishedId);
+  if(fg)return renderFinished(fg);
+  renderStart();
+}
+function renderStart(){
+  const h=hallById(db.settings.lastHallId);
+  const today=groupByDay(doneGames().filter(g=>g.date===startDate))[0];
+  const all=computeStats(db.games);
+  let html=`<div class="card" style="padding:4px 14px">
+    <button class="field" style="width:100%" data-act="pickHall"><span class="lbl">Halle</span><span class="val" style="${h?'':'color:var(--accent)'}">${h?esc(h.name):'Halle wählen'}</span>${chev}</button>
+    <label class="field"><span class="lbl">Datum</span><input type="date" id="startDate" value="${startDate}" max="${todayStr()}"></label>
+  </div>
+  <div class="stack">
+    <button class="btn primary big" data-act="newGame">Neues Spiel starten</button>
+    <button class="btn ghost" data-act="quickScore">Nur Endergebnis eintragen</button>
+  </div>`;
+  if(today){
+    html+=`<div class="card" style="margin-top:14px"><h2>${startDate===todayStr()?'Heute':fmtDate(startDate)}<small>${today.count} ${today.count===1?'Spiel':'Spiele'}</small></h2>
+      <div class="daystats" style="margin-top:0">${dayStatsHtml(today)}</div>
+      <div class="chips">${today.games.map(g=>`<button class="chip ${gameScore(g)===today.best&&today.count>1?'best':''}" data-act="game" data-id="${g.id}">${gameScore(g)}</button>`).join('')}</div></div>`;
+  }
+  if(all.done.length){
+    const last5=all.scores.slice(-5);
+    html+=`<div class="card" ${today?'':'style="margin-top:14px"'}><h2>Auf einen Blick</h2><div class="kpis">
+      <div class="kpi"><b>${num(avg(all.scores))}</b><span>Schnitt gesamt</span></div>
+      <div class="kpi"><b>${num(avg(last5))}</b><span>Ø letzte ${last5.length}</span></div>
+      <div class="kpi"><b>${Math.max(...all.scores)}</b><span>Bestes Spiel</span></div></div></div>`;
+  }else if(!today){
+    html+=`<div class="empty"><div class="big">🎳</div>Wähle deine Halle und starte dein erstes Spiel.<br>Pro Wurf tippst du einfach die getroffenen Pins an.</div>`;
+  }
+  $('#main').innerHTML=html;
+  $('#startDate').onchange=e=>{startDate=e.target.value||todayStr();renderStart()};
+}
+function scorecardHtml(g,cur){
+  const fs=frameScores(g);
+  return '<div class="scorecard">'+Array.from({length:10},(_,i)=>{
+    const m=marks(g,i);
+    return `<div class="fr ${i===9?'tenth':''} ${cur===i?'cur':''}"><div class="no">${i+1}</div><div class="boxes">${m.map(x=>`<span class="${x.split?'split':''}">${x.t}</span>`).join('')}</div><div class="tot">${fs[i]??''}</div></div>`;
+  }).join('')+'</div>';
+}
+function gameNoOfDay(g){return sortedGames(db.games.filter(x=>x.date===g.date)).findIndex(x=>x.id===g.id)+1}
+function renderGame(g){
+  const st=state(g),mode=db.settings.tapMode;
+  const count=mode==='hit'?sel.size:st.standing.length-sel.size;
+  const fresh=st.fresh;
+  document.body.classList.add('ingame');
+  let html=`<div class="gamebar"><div style="min-width:0"><div style="font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hallName(g.hallId))}</div><div class="hint">Spiel ${gameNoOfDay(g)}${g.date!==todayStr()?' · '+fmtDate(g.date):' · heute'} · <button data-act="abort" style="color:var(--danger);font-size:13px">Abbrechen</button></div></div><div class="total">${runningScore(g)}</div></div>
+  ${scorecardHtml(g,st.fi)}
+  <div class="prompt"><div><b>Frame ${st.fi+1} · ${st.ri+1}. Wurf</b><div class="hint">${mode==='hit'?'Tippe die getroffenen Pins an':'Tippe die stehenden Pins an'}</div></div>
+    <button class="btn small" data-act="undo" ${rollCount(g)?'':'disabled'}>↶ Zurück</button></div>
+  <div class="deck">${ROWS.map(r=>`<div class="prow">${r.map(p=>{
+      const c=!st.standing.includes(p)?'down':sel.has(p)?'on':'';
+      return `<button class="pin ${c}" data-act="pin" data-p="${p}" aria-label="Pin ${p}">${p}</button>`}).join('')}</div>`).join('')}</div>
+  <div class="actions">
+    <button class="btn special big" data-act="all">${fresh?'X&nbsp; Strike':'/&nbsp; Spare'}</button>
+    <button class="btn big" data-act="gutter">0&nbsp; ${fresh?'Rinne':'Daneben'}</button>
+    <button class="btn primary big wide" data-act="commit">Wurf speichern · ${count} ${count===1?'Pin':'Pins'}</button>
+  </div>`;
+  $('#main').innerHTML=html;
+}
+function afterRoll(g){
+  sel.clear();
+  if(g.done){finishedId=g.id;window.scrollTo(0,0)}
+  render();
+}
+function renderFinished(g){
+  const s=computeStats([g]),score=gameScore(g);
+  const day=groupByDay(doneGames().filter(x=>x.date===g.date))[0];
+  const all=doneGames().map(gameScore);
+  const isBest=score===Math.max(...all)&&all.length>1;
+  $('#main').innerHTML=`<div class="card">
+    <div class="hint" style="text-align:center">${esc(hallName(g.hallId))} · Spiel ${gameNoOfDay(g)}</div>
+    <div class="bigscore">${score}</div>
+    <div style="text-align:center;margin-bottom:12px" class="sub">${isBest?'🏆 Neuer persönlicher Rekord!':'Punkte'}</div>
+    ${scorecardHtml(g)}
+    <div class="kpis" style="margin-top:12px">
+      <div class="kpi"><b>${s.strikes}</b><span>Strikes</span></div>
+      <div class="kpi"><b>${s.conv.length}/${s.opp.length}</b><span>Spares</span></div>
+      <div class="kpi"><b>${num(day?.avg)}</b><span>Ø heute (${day?.count||0})</span></div>
+    </div></div>
+  <div class="stack">
+    <button class="btn primary big" data-act="nextGame" data-id="${g.id}">Nächstes Spiel</button>
+    <button class="btn" data-act="doneFinished">Fertig</button>
+    <button class="btn ghost" data-act="undoFinished" data-id="${g.id}">↶ Letzten Wurf korrigieren</button>
+  </div>`;
+}
+function startGame(hallId,date){
+  const g={id:uid(),date:date||todayStr(),hallId:hallId||null,frames:[],done:false,created:Date.now()};
+  db.games.push(g);if(hallId)db.settings.lastHallId=hallId;save();sel.clear();finishedId=null;tab='play';render();
+}
+function pickHall(onPick,currentId){
+  const draw=q=>{
+    const list=hallsByUse().filter(h=>!q||h.name.toLowerCase().includes(q.toLowerCase()));
+    const exact=db.halls.some(h=>h.name.trim().toLowerCase()===q.trim().toLowerCase());
+    let html=list.map(h=>`<button class="item ${h.id===currentId?'sel':''}" data-hid="${h.id}"><span>${esc(h.name)}</span><span class="muted" style="font-size:13px">${h.count?h.count+' Spiele':'neu'}</span></button>`).join('');
+    if(q.trim()&&!exact)html=`<button class="item add" data-new="1">+ „${esc(q.trim())}“ als neue Halle anlegen</button>`+html;
+    if(!html)html=`<div class="item muted">Noch keine Hallen. Tippe oben den Namen deiner Halle ein.</div>`;
+    return html;
+  };
+  openSheet(`<h3>Bowlinghalle</h3><input class="search" id="hallq" placeholder="Suchen oder neue Halle eingeben" autocomplete="off"><div class="list" id="halllist">${draw('')}</div>`,b=>{
+    const inp=b.querySelector('#hallq'),lst=b.querySelector('#halllist');
+    inp.oninput=()=>lst.innerHTML=draw(inp.value);
+    inp.onkeydown=e=>{if(e.key==='Enter'){const f=lst.querySelector('.item[data-new],.item[data-hid]');f&&f.click()}};
+    lst.onclick=e=>{
+      const it=e.target.closest('.item');if(!it)return;
+      let id=it.dataset.hid;
+      if(it.dataset.new){const name=inp.value.trim();if(!name)return;id=uid();db.halls.push({id,name,created:Date.now()});save();toast('Halle „'+name+'“ angelegt')}
+      if(!id)return;
+      closeSheet();onPick(id);
+    };
+    if(!db.halls.length)setTimeout(()=>inp.focus(),250);
+  });
+}
+function quickScore(){
+  const h=hallById(db.settings.lastHallId);
+  openSheet(`<h3>Endergebnis eintragen</h3>
+    <p class="hint" style="margin-top:-6px">Für Spiele, bei denen du nicht jeden Wurf erfasst hast. Sie zählen für Schnitt und Verlauf, aber nicht für die Pin-Auswertung.</p>
+    <input class="search" id="qs" type="number" inputmode="numeric" min="0" max="300" placeholder="Punkte (0–300)" style="font-size:24px;text-align:center">
+    <div class="card" style="padding:4px 14px;margin-top:10px">
+      <div class="field"><span class="lbl">Halle</span><span class="val">${h?esc(h.name):'<span class="muted">bitte wählen</span>'}</span></div>
+      <div class="field"><span class="lbl">Datum</span><span class="val">${fmtDate(startDate)}</span></div>
+    </div>
+    <button class="btn primary big" id="qssave">Speichern</button>`,b=>{
+    const inp=b.querySelector('#qs');setTimeout(()=>inp.focus(),250);
+    b.querySelector('#qssave').onclick=()=>{
+      const v=parseInt(inp.value,10);if(isNaN(v)||v<0||v>300){toast('Bitte 0 bis 300 eingeben');return}
+      const doSave=hid=>{db.games.push({id:uid(),date:startDate,hallId:hid,frames:[],done:true,scoreOnly:v,created:Date.now(),finished:Date.now()});db.settings.lastHallId=hid;save();closeSheet();toast('Spiel gespeichert');render()};
+      if(h)doSave(h.id);else pickHall(doSave);
+    };
+  });
+}
+
+/* ---------- Spiel-Detail ---------- */
+function showGame(id){
+  const g=db.games.find(x=>x.id===id);if(!g)return;
+  const s=computeStats([g]);
+  const halls=hallsByUse();
+  openSheet(`<h3>${fmtDate(g.date)} · Spiel ${gameNoOfDay(g)}</h3>
+    <div class="bigscore" style="font-size:52px">${gameScore(g)??'–'}</div>
+    <p class="hint" style="text-align:center;margin:4px 0 12px">${g.scoreOnly!=null?'Nur Endergebnis erfasst':'Punkte'}</p>
+    ${g.scoreOnly==null?scorecardHtml(g)+`<div class="kpis" style="margin-top:10px">
+      <div class="kpi"><b>${s.strikes}</b><span>Strikes</span></div>
+      <div class="kpi"><b>${s.conv.length}/${s.opp.length}</b><span>Spares</span></div>
+      <div class="kpi"><b>${pinsKnocked(g)}</b><span>Pins umgeworfen</span></div></div>`:''}
+    <div class="card" style="padding:4px 14px;margin-top:12px">
+      <label class="field"><span class="lbl">Halle</span><select id="gh">${halls.map(h=>`<option value="${h.id}" ${h.id===g.hallId?'selected':''}>${esc(h.name)}</option>`).join('')}${g.hallId?'':'<option selected value="">Ohne Halle</option>'}</select></label>
+      <label class="field"><span class="lbl">Datum</span><input type="date" id="gd" value="${g.date}" max="${todayStr()}"></label>
+    </div>
+    <button class="btn danger" id="gdel">Spiel löschen</button>`,b=>{
+    b.querySelector('#gh').onchange=e=>{g.hallId=e.target.value||null;save();render()};
+    b.querySelector('#gd').onchange=e=>{if(e.target.value){g.date=e.target.value;save();render()}};
+    b.querySelector('#gdel').onclick=async()=>{if(await ask('Dieses Spiel löschen?','Spiel löschen')){db.games=db.games.filter(x=>x.id!==g.id);if(finishedId===g.id)finishedId=null;save();closeSheet();toast('Spiel gelöscht');render()}};
+  });
+}
+
+/* ---------- Verlauf ---------- */
+function dayStatsHtml(d){
+  return `<div><b>${d.count}</b><span>Spiele</span></div><div><b>${num(d.avg)}</b><span>Ø Punkte</span></div>
+    <div><b>${num(d.total)}</b><span>Punkte ges.</span></div><div><b>${d.pins==null?'–':num(d.pins)}</b><span>Pins um</span></div>`;
+}
+function renderHistory(){
+  const days=groupByDay(doneGames());
+  if(!days.length){$('#main').innerHTML='<div class="empty"><div class="big">📅</div>Noch keine Spiele gespeichert.<br>Hier siehst du später, wann und wie oft du gespielt hast.</div>';return}
+  const [y,m]=calMonth.split('-').map(Number);
+  const first=new Date(y,m-1,1),dim=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7;
+  const dayMap=new Map(days.map(d=>[d.date,d]));
+  const maxCount=Math.max(...days.map(d=>d.count));
+  let cells=['Mo','Di','Mi','Do','Fr','Sa','So'].map(w=>`<div class="wd">${w}</div>`).join('')+'<div></div>'.repeat(offset);
+  for(let d=1;d<=dim;d++){
+    const ds=`${y}-${pad(m)}-${pad(d)}`,info=dayMap.get(ds);
+    let style='';
+    if(info){const k=Math.round(3+(info.count/maxCount)*7);style=`background:${SEQ[k]};color:${k>=6?'#fff':'#0b0b0b'}`}
+    cells+=`<button class="d ${info?'has':''} ${ds===todayStr()?'today':''}" style="${style}" ${info?`data-act="day" data-d="${ds}"`:''}>${d}${info?`<small>${info.count}×</small>`:''}</button>`;
+  }
+  const monthDays=days.filter(d=>d.date.startsWith(calMonth)).reverse();
+  const mg=monthDays.flatMap(d=>d.games);
+  const monthName=first.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  let html=`<div class="card"><div class="row between" style="margin-bottom:8px">
+      <button class="btn small" data-act="month" data-dir="-1" aria-label="Vorheriger Monat">‹</button>
+      <b>${monthName}</b>
+      <button class="btn small" data-act="month" data-dir="1" aria-label="Nächster Monat">›</button></div>
+    <div class="cal">${cells}</div>
+    <p class="hint" style="margin:10px 0 0;text-align:center">${monthDays.length?`${monthDays.length} Spieltage · ${mg.length} Spiele · Ø ${num(avg(mg.map(gameScore)))}`:'Keine Spiele in diesem Monat'}</p></div>`;
+  html+=monthDays.map(d=>`<div class="card day ${openDay===d.date?'open':''}" id="day-${d.date}">
+      <div class="row between"><b>${fmtDate(d.date,{weekday:'long',day:'numeric',month:'long'})}</b></div>
+      <div class="hint">${d.halls.map(esc).join(', ')}</div>
+      <div class="daystats">${dayStatsHtml(d)}</div>
+      <div class="chips">${d.games.map(g=>`<button class="chip ${gameScore(g)===d.best&&d.count>1?'best':''}" data-act="game" data-id="${g.id}">${gameScore(g)}${g.scoreOnly!=null?'*':''}</button>`).join('')}</div>
+    </div>`).join('');
+  if(monthDays.some(d=>d.games.some(g=>g.scoreOnly!=null)))html+='<p class="hint">* nur Endergebnis erfasst. „Pins um“ zählt die tatsächlich umgeworfenen Pins der vollständig erfassten Spiele.</p>';
+  $('#main').innerHTML=html;
+  if(openDay){const el=document.getElementById('day-'+openDay);el&&el.scrollIntoView({behavior:'smooth',block:'center'})}
+}
+
+/* ---------- Statistik ---------- */
+let charts=[];
+function filteredGames(){
+  let gs=doneGames();
+  if(statFilter.hall!=='all')gs=gs.filter(g=>g.hallId===statFilter.hall);
+  const days={'30':30,'90':90,'365':365}[statFilter.period];
+  if(days){const d=new Date();d.setDate(d.getDate()-days+1);const c=dstr(d);gs=gs.filter(g=>g.date>=c)}
+  return gs;
+}
+function renderStats(){
+  charts=[];
+  const halls=hallsByUse().filter(h=>h.count);
+  const per=[['all','Alle'],['30','30 T'],['90','90 T'],['365','1 Jahr']];
+  let html=`<div class="filters"><div class="seg">${per.map(([k,l])=>`<button class="${statFilter.period===k?'on':''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
+    ${halls.length>1?`<select id="hallf"><option value="all">Alle Hallen</option>${halls.map(h=>`<option value="${h.id}" ${statFilter.hall===h.id?'selected':''}>${esc(h.name)}</option>`).join('')}</select>`:''}</div>`;
+  const S=computeStats(filteredGames());
+  if(!S.done.length){
+    $('#main').innerHTML=html+'<div class="empty"><div class="big">📈</div>Noch keine abgeschlossenen Spiele in diesem Zeitraum.</div>';
+    bindHallFilter();return;
+  }
+  const R=S.R.length;
+  html+=`<div class="card"><h2>Überblick<small>${S.done.length} Spiele</small></h2><div class="kpis">
+    <div class="kpi"><b>${num(avg(S.scores))}</b><span>Schnitt</span></div>
+    <div class="kpi"><b>${Math.max(...S.scores)}</b><span>Bestes Spiel</span></div>
+    <div class="kpi"><b>${Math.min(...S.scores)}</b><span>Schwächstes</span></div>
+    <div class="kpi"><b>${pct(S.strikes,R)}</b><span>Strike-Quote</span></div>
+    <div class="kpi"><b>${pct(S.conv.length,S.opp.length)}</b><span>Spare-Quote</span></div>
+    <div class="kpi"><b>${num(S.firstAvg,1)}</b><span>Ø Pins 1. Wurf</span></div>
+    <div class="kpi"><b>${pct(S.singleConv,S.single)}</b><span>Einzelpins geräumt</span></div>
+    <div class="kpi"><b>${pct(S.splits,R)}</b><span>Splits (1. Wurf)</span></div>
+    <div class="kpi"><b>${pct(S.open,R)}</b><span>Offene Frames</span></div>
+  </div>${S.tracked.length<S.done.length?`<p class="hint" style="margin:8px 0 0">Wurf-Werte aus ${S.tracked.length} vollständig erfassten Spielen.</p>`:''}</div>`;
+
+  // Punkteverlauf
+  const sc=S.scores,ma=sc.map((_,i)=>i<2?null:avg(sc.slice(Math.max(0,i-4),i+1)));
+  let trend='';
+  if(sc.length>=4){
+    const n=Math.min(10,Math.floor(sc.length/2)),a=avg(sc.slice(-n)),b=avg(sc.slice(-2*n,-n)),d=a-b;
+    trend=`<p class="trend">Letzte ${n} Spiele: <b>Ø ${num(a)}</b> · ${Math.abs(d)<0.5?'gleich geblieben':(d>0?'▲ '+num(d,1)+' besser':'▼ '+num(-d,1)+' schlechter')} als die ${n} davor</p>`;
+  }
+  html+=`<div class="card"><h2>Punkteverlauf</h2>${trend}
+    <div class="legend"><span><i style="background:var(--s1)"></i>Spiel</span><span><i class="line" style="background:var(--s2)"></i>Ø letzte 5 Spiele</span></div>
+    <div class="chart" id="ch1"></div></div>`;
+  charts.push(['ch1',{h:200,labels:S.done.map(g=>fmtShort(g.date)),series:[{kind:'dot',color:'var(--s1)',values:sc},{kind:'line',color:'var(--s2)',values:ma}],
+    tip:i=>`${fmtDate(S.done[i].date)}<br><b>${sc[i]}</b> Punkte${ma[i]!=null?' · Ø5 '+num(ma[i]):''}<br><span class="muted">${esc(hallName(S.done[i].hallId))}</span>`}]);
+
+  // Tagesschnitt
+  const days=groupByDay(S.done).slice(-30);
+  html+=`<div class="card"><h2>Schnitt pro Spieltag<small>${days.length>=30?'letzte 30 Spieltage':days.length+' Spieltage'}</small></h2><div class="chart" id="ch2"></div></div>`;
+  charts.push(['ch2',{h:180,yMin:0,labels:days.map(d=>fmtShort(d.date)),series:[{kind:'bar',color:'var(--s1)',values:days.map(d=>d.avg)}],
+    tip:i=>`${fmtDate(days[i].date)}<br><b>Ø ${num(days[i].avg)}</b> · ${days[i].count} ${days[i].count===1?'Spiel':'Spiele'}<br>${num(days[i].total)} Punkte${days[i].pins!=null?' · '+num(days[i].pins)+' Pins um':''}`}]);
+
+  // Strike/Spare pro Tag
+  const tdays=groupByDay(S.tracked).slice(-30).map(d=>{const s=computeStats(d.games);return {date:d.date,st:s.R.length?s.strikes/s.R.length*100:null,sp:s.opp.length?s.conv.length/s.opp.length*100:null}});
+  if(tdays.length>=2){
+    html+=`<div class="card"><h2>Strike- & Spare-Quote pro Spieltag</h2>
+      <div class="legend"><span><i class="line" style="background:var(--s1)"></i>Strikes</span><span><i class="line" style="background:var(--s2)"></i>Spares</span></div>
+      <div class="chart" id="ch3"></div></div>`;
+    charts.push(['ch3',{h:170,yMin:0,yMax:100,unit:' %',labels:tdays.map(d=>fmtShort(d.date)),series:[{kind:'line',dots:true,color:'var(--s1)',values:tdays.map(d=>d.st)},{kind:'line',dots:true,color:'var(--s2)',values:tdays.map(d=>d.sp)}],
+      tip:i=>`${fmtDate(tdays[i].date)}<br>Strikes <b>${num(tdays[i].st)} %</b><br>Spares <b>${num(tdays[i].sp)} %</b>`}]);
+  }
+
+  // Pins
+  if(R){
+    const st={},lf={};PINS.forEach(p=>{st[p]=S.stand[p]/R;lf[p]=S.opp.length?S.left[p]/S.opp.length:0});
+    const worst=PINS.slice().sort((a,b)=>S.stand[b]-S.stand[a])[0];
+    html+=`<div class="card"><h2>Welche Pins bleiben stehen?</h2>
+      <p class="trend">Am häufigsten nach dem 1. Wurf: <b>Pin ${worst}</b> (${pct(S.stand[worst],R)} der Würfe)</p>
+      <div class="pinmaps"><figure>${pinMap(st,150)}<figcaption>Stehen nach dem 1. Wurf</figcaption></figure>
+      <figure>${pinMap(lf,150)}<figcaption>Bleiben stehen nach dem 2. Wurf (Anteil Spare-Versuche)</figcaption></figure></div></div>`;
+    const top=S.leaves.slice(0,10);
+    if(top.length){
+      html+=`<div class="card"><h2>Häufigste Restbilder<small>nach dem 1. Wurf</small></h2>${top.map(L=>`<div class="leave">${pinMini(L.pins)}
+        <div style="flex:1"><div class="row between"><span class="nm">${L.pins.join('-')}${isSplit(PINS.filter(p=>!L.pins.includes(p)))?' <span class="hint">(Split)</span>':''}</span><span class="hint">${L.n}× · ${Math.round(L.ok/L.n*100)} % geräumt</span></div>
+        <div class="bar"><i style="width:${Math.round(L.ok/L.n*100)}%"></i></div></div></div>`).join('')}</div>`;
+    }
+  }
+  // Hallen
+  const hm=new Map();S.done.forEach(g=>{const k=g.hallId||'';if(!hm.has(k))hm.set(k,[]);hm.get(k).push(gameScore(g))});
+  if(hm.size>1||statFilter.hall==='all'){
+    html+=`<div class="card"><h2>Nach Halle</h2><table class="t"><tr><th>Halle</th><th class="n">Spiele</th><th class="n">Ø</th><th class="n">Bestes</th></tr>
+      ${[...hm.entries()].sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>`<tr><td>${esc(hallName(k))}</td><td class="n">${v.length}</td><td class="n">${num(avg(v))}</td><td class="n">${Math.max(...v)}</td></tr>`).join('')}</table></div>`;
+  }
+  // Wochentage / Rhythmus
+  const wd=[0,0,0,0,0,0,0];S.done.forEach(g=>wd[(toDate(g.date).getDay()+6)%7]++);
+  const dset=groupByDay(S.done);
+  html+=`<div class="card"><h2>Wann du spielst</h2><div class="kpis" style="margin-bottom:10px">
+      <div class="kpi"><b>${dset.length}</b><span>Spieltage</span></div>
+      <div class="kpi"><b>${num(S.done.length/dset.length,1)}</b><span>Spiele pro Tag</span></div>
+      <div class="kpi"><b>${num(sum(S.tracked.map(pinsKnocked)))}</b><span>Pins umgeworfen</span></div></div>
+    <div class="chart" id="ch4"></div></div>`;
+  const WD=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  charts.push(['ch4',{h:130,yMin:0,labels:WD,allLabels:true,series:[{kind:'bar',color:'var(--s1)',values:wd}],tip:i=>`${WD[i]}: <b>${wd[i]}</b> Spiele`}]);
+
+  $('#main').innerHTML=html;
+  bindHallFilter();
+  charts.forEach(([id,cfg])=>drawChart(document.getElementById(id),cfg));
+}
+function bindHallFilter(){const s=$('#hallf');if(s)s.onchange=e=>{statFilter.hall=e.target.value;renderStats()}}
+function pinPos(size){
+  const s=size/4.2,pos={};
+  ROWS.forEach((r,ri)=>r.forEach((p,j)=>{pos[p]=[size/2+(j-(r.length-1)/2)*s,s*0.62+ri*s*0.88]}));
+  return {pos,s,h:s*0.62*2+3*s*0.88};
+}
+function pinMap(vals,size){
+  const {pos,s,h}=pinPos(size);const vs=Object.values(vals),mx=Math.max(...vs),mn=Math.min(...vs);
+  return `<svg viewBox="0 0 ${size} ${h}" style="max-width:${size}px;width:100%">${PINS.map(p=>{
+    const v=vals[p],k=1+Math.round((v-mn)/(mx-mn||1)*(SEQ.length-3));const[x,y]=pos[p];
+    return `<g><title>Pin ${p}: ${Math.round(v*100)} %</title><circle cx="${x}" cy="${y}" r="${s*0.44}" fill="${SEQ[k]}"/>
+      <text x="${x}" y="${y+4}" text-anchor="middle" font-size="${s*0.27}" font-weight="700" fill="${k>=6?'#fff':'#0b0b0b'}">${Math.round(v*100)}%</text></g>`}).join('')}</svg>`;
+}
+function pinMini(standing){
+  const size=58,{pos,s,h}=pinPos(size);
+  return `<svg width="${size}" height="${h}" viewBox="0 0 ${size} ${h}" style="flex:none">${PINS.map(p=>{const[x,y]=pos[p];const on=standing.includes(p);
+    return `<circle cx="${x}" cy="${y}" r="${s*0.36}" fill="${on?'var(--s1)':'none'}" stroke="${on?'var(--s1)':'var(--border)'}" stroke-width="1.5"/>`}).join('')}</svg>`;
+}
+function niceStep(raw){const p=Math.pow(10,Math.floor(Math.log10(raw||1))),r=raw/p;return(r<=1?1:r<=2?2:r<=5?5:10)*p}
+function drawChart(el,cfg){
+  if(!el)return;
+  const W=Math.max(260,el.clientWidth||320),H=cfg.h||180,pl=34,pr=6,pt=10,pb=22,w=W-pl-pr,h=H-pt-pb,n=cfg.labels.length;
+  const vals=cfg.series.flatMap(s=>s.values).filter(v=>v!=null);
+  let lo=cfg.yMin??Math.min(...vals),hi=cfg.yMax??Math.max(...vals);
+  if(hi===lo){hi+=10;lo=Math.max(0,lo-10)}
+  const step=niceStep((hi-lo)/4);if(cfg.yMin==null)lo=Math.floor(lo/step)*step;if(cfg.yMax==null)hi=Math.ceil(hi/step)*step;
+  const Y=v=>pt+h-(v-lo)/(hi-lo)*h,X=i=>pl+(i+.5)*w/n;
+  let g='<g class="grid">';for(let v=lo;v<=hi+1e-9;v+=step)g+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}"/>`;g+='</g>';
+  let ax='<g class="axis">';for(let v=lo;v<=hi+1e-9;v+=step)ax+=`<text x="${pl-6}" y="${Y(v)+4}" text-anchor="end">${Math.round(v)}</text>`;
+  const idx=cfg.allLabels?[...Array(n).keys()]:n<=1?[0]:[...new Set([0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1])].filter(i=>n>=4||i===0||i===n-1);
+  idx.forEach(i=>ax+=`<text x="${X(i)}" y="${H-5}" text-anchor="${cfg.allLabels?'middle':i===0&&n>1?'start':i===n-1&&n>1?'end':'middle'}" ${!cfg.allLabels&&i===0&&n>1?`dx="-${Math.min(w/n/2,0)}"`:''}>${esc(cfg.labels[i])}</text>`);
+  ax+='</g>';
+  let marks='';
+  cfg.series.forEach(s=>{
+    if(s.kind==='bar'){
+      const bw=Math.max(3,Math.min(28,w/n*0.7)),r=Math.min(4,bw/2);
+      s.values.forEach((v,i)=>{if(v==null||v<=lo)return;const x=X(i)-bw/2,y=Y(v),b=Y(Math.max(lo,0));const rr=Math.min(r,b-y);
+        marks+=`<path d="M${x},${b}V${y+rr}Q${x},${y} ${x+rr},${y}H${x+bw-rr}Q${x+bw},${y} ${x+bw},${y+rr}V${b}Z" fill="${s.color}"/>`});
+    }else if(s.kind==='line'){
+      let d='',pen=false;s.values.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+X(i)+','+Y(v);pen=true});
+      marks+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      if(s.dots||n===1)s.values.forEach((v,i)=>{if(v!=null)marks+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3.5" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"/>`});
+    }else{
+      const r=n>60?3:4;s.values.forEach((v,i)=>{if(v!=null)marks+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${r}" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"/>`});
+    }
+  });
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" height="${H}">${g}${ax}${marks}<line class="cross" x1="0" x2="0" y1="${pt}" y2="${pt+h}" stroke="var(--text-2)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>
+    <rect x="${pl}" y="0" width="${w}" height="${H}" fill="transparent" style="touch-action:pan-y"/></svg><div class="tip"></div>`;
+  const svg=el.querySelector('svg'),tip=el.querySelector('.tip'),cross=el.querySelector('.cross'),hit=el.querySelector('rect');
+  const show=e=>{
+    const bb=svg.getBoundingClientRect(),px=(e.clientX-bb.left)*W/bb.width;
+    const i=Math.max(0,Math.min(n-1,Math.floor((px-pl)/w*n)));
+    cross.setAttribute('x1',X(i));cross.setAttribute('x2',X(i));cross.style.display='';
+    tip.innerHTML=cfg.tip(i);tip.style.display='block';
+    const left=X(i)*bb.width/W,tw=tip.offsetWidth;
+    tip.style.left=Math.max(0,Math.min(bb.width-tw,left-tw/2))+'px';tip.style.top=(-tip.offsetHeight-4)+'px';
+  };
+  hit.addEventListener('pointerdown',show);hit.addEventListener('pointermove',show);
+  hit.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){tip.style.display='none';cross.style.display='none'}});
+}
+
+/* ---------- Mehr ---------- */
+function renderMore(){
+  const halls=hallsByUse();
+  const lb=db.settings.lastBackup;const gcount=doneGames().length;
+  const since=lb?Math.floor((Date.now()-lb)/864e5):null;
+  $('#main').innerHTML=`<div class="card"><h2>Pins antippen</h2>
+      <div class="seg"><button class="${db.settings.tapMode==='hit'?'on':''}" data-act="tapMode" data-v="hit">Getroffene Pins</button><button class="${db.settings.tapMode==='left'?'on':''}" data-act="tapMode" data-v="left">Stehende Pins</button></div>
+      <p class="hint" style="margin:8px 0 0">Bei „Stehende Pins“ tippst du die Pins an, die nach dem Wurf noch stehen. Das geht oft schneller.</p></div>
+    <div class="card"><h2>Bowlinghallen<small>${halls.length}</small></h2>
+      ${halls.length?`<div class="list" style="margin-top:0">${halls.map(h=>`<div class="item"><span>${esc(h.name)}<br><span class="hint">${h.count} Spiele${h.last?' · zuletzt '+fmtDate(h.last,{day:'2-digit',month:'2-digit',year:'numeric'}):''}</span></span>
+        <span class="row"><button class="btn small" data-act="renameHall" data-id="${h.id}">Umbenennen</button>${h.count?'':`<button class="btn small" style="color:var(--danger)" data-act="delHall" data-id="${h.id}">Löschen</button>`}</span></div>`).join('')}</div>`:'<p class="hint">Noch keine Hallen. Neue Hallen legst du beim Spielstart an.</p>'}
+      <button class="btn" style="margin-top:10px" data-act="addHall">+ Halle hinzufügen</button></div>
+    <div class="card"><h2>Datensicherung</h2>
+      <p class="hint" style="margin-top:-4px">Deine Daten liegen nur auf diesem iPhone. ${lb?`Letzte Sicherung vor ${since===0?'weniger als einem Tag':since+' '+(since===1?'Tag':'Tagen')}.`:'Bisher keine Sicherung.'} Sichere regelmäßig, z. B. in „Dateien“ oder iCloud Drive.</p>
+      <div class="stack"><button class="btn primary" data-act="export">Backup speichern</button>
+      <button class="btn" data-act="import">Backup wiederherstellen</button>
+      <button class="btn" data-act="csv" ${gcount?'':'disabled'}>Als Tabelle exportieren (CSV)</button></div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden></div>
+    <div class="card"><h2>Als App auf dem iPhone</h2><ol class="steps hint">
+      <li>Diese Seite in <b>Safari</b> öffnen.</li><li>Auf <b>Teilen</b> (Quadrat mit Pfeil) tippen.</li><li><b>„Zum Home-Bildschirm“</b> wählen.</li>
+      <li>Ab dann nur noch über das Icon starten. Die App funktioniert auch ohne Internet.</li></ol>
+      <p class="hint">Wichtig: Safari und die Home-Bildschirm-App haben getrennte Speicher. Spiele, die du vorher in Safari erfasst hast, holst du per Backup rüber.</p></div>
+    <button class="btn danger" data-act="wipe">Alle Daten löschen</button>
+    <p class="hint" style="text-align:center">${db.games.length} Spiele gespeichert · Bowling Tracker 1.0</p>`;
+  $('#importFile').onchange=importFile;
+}
+async function shareOrDownload(text,name,type){
+  const file=new File([text],name,{type});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:name});return true}catch(e){if(e.name==='AbortError')return false}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);return true;
+}
+async function exportBackup(){
+  const ok=await shareOrDownload(JSON.stringify(db),'bowling-backup-'+todayStr()+'.json','application/json');
+  if(ok){db.settings.lastBackup=Date.now();save();render();toast('Backup erstellt')}
+}
+function exportCsv(){
+  const rows=[['Datum','Halle','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
+  sortedGames(doneGames()).forEach(g=>{const s=computeStats([g]);
+    rows.push([g.date,hallName(g.hallId),gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
+  const csv='﻿'+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n');
+  shareOrDownload(csv,'bowling-spiele-'+todayStr()+'.csv','text/csv');
+}
+function importFile(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    let data;try{data=JSON.parse(r.result)}catch(err){toast('Datei ist kein gültiges Backup');return}
+    if(!data||!Array.isArray(data.games)||!Array.isArray(data.halls)){toast('Datei ist kein gültiges Backup');return}
+    openSheet(`<h3>Backup wiederherstellen</h3><p class="sub">Das Backup enthält ${data.games.length} Spiele und ${data.halls.length} Hallen.</p>
+      <div class="stack"><button class="btn primary" id="imMerge">Zusammenführen</button><p class="hint" style="margin:4px 0 8px">Fügt fehlende Spiele hinzu, nichts wird gelöscht. Empfohlen.</p>
+      <button class="btn" id="imReplace">Alles ersetzen</button><p class="hint" style="margin:4px 0 0">Löscht die aktuellen Daten auf diesem Gerät und übernimmt das Backup.</p></div>`,b=>{
+      b.querySelector('#imMerge').onclick=()=>{
+        const hids=new Set(db.halls.map(h=>h.id)),gids=new Set(db.games.map(g=>g.id));let n=0;
+        data.halls.forEach(h=>{if(!hids.has(h.id))db.halls.push(h)});
+        data.games.forEach(g=>{if(!gids.has(g.id)){db.games.push(g);n++}});
+        save();closeSheet();toast(n+' Spiele übernommen');render();
+      };
+      b.querySelector('#imReplace').onclick=async()=>{if(!await ask('Alle aktuellen Daten durch das Backup ersetzen?','Ersetzen'))return;
+        db=Object.assign(emptyDb(),data);db.settings=Object.assign(emptyDb().settings,data.settings||{});save();closeSheet();toast('Backup wiederhergestellt');render()};
+    });
+  };
+  r.readAsText(f);e.target.value='';
+}
+
+/* ---------- Aktionen ---------- */
+const actions={
+  pin(el){const p=+el.dataset.p;sel.has(p)?sel.delete(p):sel.add(p);renderGame(activeGame())},
+  commit(){const g=activeGame(),st=state(g);const kn=db.settings.tapMode==='hit'?[...sel]:st.standing.filter(p=>!sel.has(p));addRoll(g,kn);afterRoll(g)},
+  all(){const g=activeGame();addRoll(g,state(g).standing);afterRoll(g)},
+  gutter(){const g=activeGame();addRoll(g,[]);afterRoll(g)},
+  undo(){const g=activeGame();undoRoll(g);sel.clear();render()},
+  async abort(){const g=activeGame();if(!g)return;if(rollCount(g)&&!await ask('Laufendes Spiel verwerfen?','Spiel verwerfen'))return;db.games=db.games.filter(x=>x.id!==g.id);save();sel.clear();render()},
+  pickHall(){pickHall(id=>{db.settings.lastHallId=id;save();render()},db.settings.lastHallId)},
+  newGame(){const h=hallById(db.settings.lastHallId);if(h)startGame(h.id,startDate);else pickHall(id=>startGame(id,startDate))},
+  quickScore,
+  nextGame(el){const g=db.games.find(x=>x.id===el.dataset.id);startGame(g?.hallId,g?.date)},
+  doneFinished(){finishedId=null;render()},
+  undoFinished(el){const g=db.games.find(x=>x.id===el.dataset.id);if(g){undoRoll(g);finishedId=null;sel.clear();render()}},
+  game(el){showGame(el.dataset.id)},
+  day(el){openDay=el.dataset.d;renderHistory()},
+  month(el){const[y,m]=calMonth.split('-').map(Number);const d=new Date(y,m-1+(+el.dataset.dir),1);calMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);openDay=null;renderHistory()},
+  period(el){statFilter.period=el.dataset.v;renderStats()},
+  tapMode(el){db.settings.tapMode=el.dataset.v;save();sel.clear();renderMore();toast(el.dataset.v==='hit'?'Du tippst jetzt getroffene Pins':'Du tippst jetzt stehende Pins')},
+  async renameHall(el){const h=hallById(el.dataset.id);const n=await askText('Halle umbenennen',h.name);if(n&&n.trim()){h.name=n.trim();save();render()}},
+  async delHall(el){const h=hallById(el.dataset.id);if(await ask('Halle „'+h.name+'“ löschen?','Halle löschen')){db.halls=db.halls.filter(x=>x.id!==h.id);if(db.settings.lastHallId===h.id)db.settings.lastHallId=null;save();render()}},
+  async addHall(){const n=await askText('Name der Bowlinghalle','');if(!n||!n.trim())return;if(db.halls.some(h=>h.name.toLowerCase()===n.trim().toLowerCase())){toast('Diese Halle gibt es schon');return}db.halls.push({id:uid(),name:n.trim(),created:Date.now()});save();render()},
+  export:exportBackup,csv:exportCsv,
+  import(){$('#importFile').click()},
+  async wipe(){if(await ask('Wirklich ALLE Spiele und Hallen löschen? Das lässt sich nicht rückgängig machen.','Alles löschen')){db=emptyDb();save();finishedId=null;render();toast('Alle Daten gelöscht')}},
+};
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;closeSheet();if(tab==='history'&&!openDay)calMonth=calMonth||todayStr().slice(0,7);window.scrollTo(0,0);render();return}
+  const a=e.target.closest('[data-act]');if(a&&actions[a.dataset.act]){actions[a.dataset.act](a)}
+});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='stats')renderStats()},200)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&tab==='play'&&!activeGame()){const t=todayStr();if(startDate<t&&!finishedId){startDate=t;render()}}});
+render();
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+</script>
+</body>
+</html>
