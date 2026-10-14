@@ -220,10 +220,10 @@ const pct=(a,b)=>b?Math.round(a/b*100)+' %':'–';
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 const sum=a=>a.reduce((x,y)=>x+y,0);
 
-function emptyDb(){return {v:1,halls:[],games:[],settings:{tapMode:'hit',lastHallId:null,lastBackup:null,lastType:'game'}}}
+function emptyDb(){return {v:1,halls:[],balls:[],oils:[],games:[],settings:{tapMode:'hit',lastHallId:null,lastBackup:null,lastType:'game',lastBallId:null,lastOil:null}}}
 let db;
 try{db=JSON.parse(localStorage.getItem(KEY))||emptyDb()}catch(e){db=emptyDb()}
-db.settings=Object.assign(emptyDb().settings,db.settings||{});db.halls=db.halls||[];db.games=db.games||[];
+db.settings=Object.assign(emptyDb().settings,db.settings||{});db.halls=db.halls||[];db.balls=db.balls||[];db.oils=db.oils||[];db.games=db.games||[];
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Speichern fehlgeschlagen')}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 
@@ -322,6 +322,26 @@ const hallName=id=>hallById(id)?.name||'Ohne Halle';
 const doneGames=()=>db.games.filter(g=>g.done);
 const activeGame=()=>db.games.find(g=>!g.done&&g.scoreOnly==null);
 function sortedGames(list){return list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.created||0)-(b.created||0))}
+const OIL_PRESETS=['Hausmuster (House Shot)','Kurz (bis 37 ft)','Mittel (38–42 ft)','Lang (ab 43 ft)','Sportmuster','Cheetah (PBA)','Chameleon (PBA)','Scorpion (PBA)','Shark (PBA)','Viper (PBA)','Bear (PBA)','Badger (PBA)','Wolf (PBA)'];
+const ballById=id=>db.balls.find(b=>b.id===id);
+const ballName=id=>ballById(id)?.name||'Keine Angabe';
+const oilName=o=>o||'Keine Angabe';
+function usage(field){
+  const last={},cnt={};
+  db.games.forEach(g=>{const k=g[field];if(!k)return;cnt[k]=(cnt[k]||0)+1;if(!last[k]||g.date>last[k])last[k]=g.date});
+  return {cnt,last};
+}
+function ballsByUse(){
+  const {cnt,last}=usage('ballId');
+  return db.balls.map(b=>({...b,count:cnt[b.id]||0,last:last[b.id]||''})).sort((a,b)=>b.last.localeCompare(a.last)||a.name.localeCompare(b.name,'de'));
+}
+function oilsList(){
+  const {cnt,last}=usage('oil');
+  const names=[...OIL_PRESETS,...db.oils.map(o=>o.name)];
+  Object.keys(cnt).forEach(n=>{if(!names.includes(n))names.push(n)});
+  return names.map((n,i)=>({id:n,name:n,count:cnt[n]||0,last:last[n]||'',custom:!OIL_PRESETS.includes(n),i}))
+    .sort((a,b)=>b.last.localeCompare(a.last)||a.i-b.i);
+}
 function hallsByUse(){
   const last={},cnt={};
   db.games.forEach(g=>{if(!g.hallId)return;cnt[g.hallId]=(cnt[g.hallId]||0)+1;if(!last[g.hallId]||g.date>last[g.hallId])last[g.hallId]=g.date});
@@ -362,7 +382,7 @@ function computeStats(games){
 
 /* ---------- UI-Grundgerüst ---------- */
 let tab='play',sel=new Set(),finishedId=null,startDate=todayStr();
-let statFilter={period:'all',hall:'all',type:'all'};
+let statFilter={period:'all',hall:'all',type:'all',ball:'all',oil:'all'};
 let calMonth=todayStr().slice(0,7),openDay=null;
 const TITLES={play:'Spielen',history:'Verlauf',stats:'Statistik',more:'Mehr'};
 const chev='<svg class="chev" width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l6 6-6 6"/></svg>';
@@ -372,7 +392,7 @@ function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   ({play:renderPlay,history:renderHistory,stats:renderStats,more:renderMore})[tab]();
 }
-function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+function toast(msg){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 function openSheet(html,onMount){
   closeSheet();
   const b=document.createElement('div');b.className='backdrop';b.id='sheet';
@@ -412,6 +432,8 @@ function renderStart(){
     <button class="field" style="width:100%" data-act="pickHall"><span class="lbl">Halle</span><span class="val" style="${h?'':'color:var(--accent)'}">${h?esc(h.name):'Halle wählen'}</span>${chev}</button>
     <label class="field"><span class="lbl">Datum</span><input type="date" id="startDate" value="${startDate}" max="${todayStr()}"></label>
     <div class="field"><span class="lbl">Art</span>${typeSeg(db.settings.lastType,'setType')}</div>
+    <button class="field" style="width:100%" data-act="pick" data-kind="oil"><span class="lbl">Ölbild</span><span class="val ${db.settings.lastOil?'':'muted'}">${esc(oilName(db.settings.lastOil))}</span>${chev}</button>
+    <button class="field" style="width:100%" data-act="pick" data-kind="ball"><span class="lbl">Ball</span><span class="val ${ballById(db.settings.lastBallId)?'':'muted'}">${esc(ballName(db.settings.lastBallId))}</span>${chev}</button>
   </div>
   <div class="stack">
     <button class="btn primary big" data-act="newGame">${db.settings.lastType==='training'?'Training starten':'Neues Spiel starten'}</button>
@@ -447,7 +469,10 @@ function renderGame(g){
   const count=mode==='hit'?sel.size:st.standing.length-sel.size;
   const fresh=st.fresh;
   document.body.classList.add('ingame');
-  let html=`<div class="gamebar"><div style="min-width:0"><div style="font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hallName(g.hallId))}</div><div class="hint">${typeOf(g)==='training'?'<b>Training</b>':'Spiel'} ${gameNoOfDay(g)}${g.date!==todayStr()?' · '+fmtDate(g.date):' · heute'} · <button data-act="abort" style="color:var(--danger);font-size:13px">Abbrechen</button></div></div><div class="total">${runningScore(g)}</div></div>
+  const extra=[g.oil,ballById(g.ballId)?.name].filter(Boolean).map(esc).join(' · ');
+  let html=`<div class="gamebar"><div style="min-width:0;flex:1"><div style="font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(hallName(g.hallId))}</div>
+      <div class="hint" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${typeOf(g)==='training'?'<b>Training</b>':'Spiel'} ${gameNoOfDay(g)}${g.date!==todayStr()?' · '+fmtDate(g.date):' · heute'}${extra?' · '+extra:''}</div></div>
+    <button class="btn small" data-act="abort" style="color:var(--danger);flex:none">✕ Abbrechen</button><div class="total">${runningScore(g)}</div></div>
   ${scorecardHtml(g,st.fi)}
   <div class="prompt"><div><b>Frame ${st.fi+1} · ${st.ri+1}. Wurf</b><div class="hint">${mode==='hit'?'Tippe die getroffenen Pins an':'Tippe die stehenden Pins an'}</div></div>
     <button class="btn small" data-act="undo" ${rollCount(g)?'':'disabled'}>↶ Zurück</button></div>
@@ -487,33 +512,46 @@ function renderFinished(g){
     <button class="btn ghost" data-act="undoFinished" data-id="${g.id}">↶ Letzten Wurf korrigieren</button>
   </div>`;
 }
-function startGame(hallId,date,type){
-  const g={id:uid(),date:date||todayStr(),hallId:hallId||null,type:type||db.settings.lastType||'game',frames:[],done:false,created:Date.now()};
+function startGame(hallId,date,type,ballId,oil){
+  const g={id:uid(),date:date||todayStr(),hallId:hallId||null,type:type||db.settings.lastType||'game',
+    ballId:ballId!==undefined?ballId:(ballById(db.settings.lastBallId)?db.settings.lastBallId:null),oil:oil!==undefined?oil:(db.settings.lastOil||null),frames:[],done:false,created:Date.now()};
   db.games.push(g);if(hallId)db.settings.lastHallId=hallId;save();sel.clear();finishedId=null;tab='play';render();
 }
-function pickHall(onPick,currentId){
+const KINDS={
+  hall:{title:'Bowlinghalle',ph:'Suchen oder neue Halle eingeben',newLabel:'als neue Halle anlegen',empty:'Noch keine Hallen. Tippe oben den Namen deiner Halle ein.',
+    items:()=>hallsByUse(),add:name=>{const id=uid();db.halls.push({id,name,created:Date.now()});return id}},
+  ball:{title:'Ball',ph:'Suchen oder neuen Ball eingeben',newLabel:'als neuen Ball anlegen',empty:'Noch keine Bälle. Tippe oben den Namen deines Balls ein.',none:'Keine Angabe',
+    items:()=>ballsByUse(),add:name=>{const id=uid();db.balls.push({id,name,created:Date.now()});return id}},
+  oil:{title:'Ölbild',ph:'Suchen oder eigenes Ölbild eingeben',newLabel:'als eigenes Ölbild anlegen',empty:'',none:'Keine Angabe',
+    items:()=>oilsList(),add:name=>{db.oils.push({id:uid(),name,created:Date.now()});return name}},
+};
+function pickFrom(kind,onPick,currentId){
+  const K=KINDS[kind];
   const draw=q=>{
-    const list=hallsByUse().filter(h=>!q||h.name.toLowerCase().includes(q.toLowerCase()));
-    const exact=db.halls.some(h=>h.name.trim().toLowerCase()===q.trim().toLowerCase());
-    let html=list.map(h=>`<button class="item ${h.id===currentId?'sel':''}" data-hid="${h.id}"><span>${esc(h.name)}</span><span class="muted" style="font-size:13px">${h.count?h.count+' Spiele':'neu'}</span></button>`).join('');
-    if(q.trim()&&!exact)html=`<button class="item add" data-new="1">+ „${esc(q.trim())}“ als neue Halle anlegen</button>`+html;
-    if(!html)html=`<div class="item muted">Noch keine Hallen. Tippe oben den Namen deiner Halle ein.</div>`;
+    const all=K.items(),list=all.filter(h=>!q||h.name.toLowerCase().includes(q.toLowerCase()));
+    const exact=all.some(h=>h.name.trim().toLowerCase()===q.trim().toLowerCase());
+    let html=list.map(h=>`<button class="item ${h.id===currentId?'sel':''}" data-hid="${esc(h.id)}"><span>${esc(h.name)}</span><span class="muted" style="font-size:13px">${h.count?h.count+' Spiele':kind==='oil'&&!h.custom?'':'neu'}</span></button>`).join('');
+    if(K.none&&!q.trim())html=`<button class="item ${!currentId?'sel':''}" data-none="1"><span class="sub">${K.none}</span></button>`+html;
+    if(q.trim()&&!exact)html=`<button class="item add" data-new="1">+ „${esc(q.trim())}“ ${K.newLabel}</button>`+html;
+    if(!html)html=`<div class="item muted">${K.empty}</div>`;
     return html;
   };
-  openSheet(`<h3>Bowlinghalle</h3><input class="search" id="hallq" placeholder="Suchen oder neue Halle eingeben" autocomplete="off"><div class="list" id="halllist">${draw('')}</div>`,b=>{
+  openSheet(`<h3>${K.title}</h3><input class="search" id="hallq" placeholder="${K.ph}" autocomplete="off"><div class="list" id="halllist">${draw('')}</div>`,b=>{
     const inp=b.querySelector('#hallq'),lst=b.querySelector('#halllist');
     inp.oninput=()=>lst.innerHTML=draw(inp.value);
     inp.onkeydown=e=>{if(e.key==='Enter'){const f=lst.querySelector('.item[data-new],.item[data-hid]');f&&f.click()}};
     lst.onclick=e=>{
       const it=e.target.closest('.item');if(!it)return;
+      if(it.dataset.none){closeSheet();onPick(null);return}
       let id=it.dataset.hid;
-      if(it.dataset.new){const name=inp.value.trim();if(!name)return;id=uid();db.halls.push({id,name,created:Date.now()});save();toast('Halle „'+name+'“ angelegt')}
+      if(it.dataset.new){const name=inp.value.trim();if(!name)return;id=K.add(name);save();toast('„'+name+'“ angelegt')}
       if(!id)return;
       closeSheet();onPick(id);
     };
-    if(!db.halls.length)setTimeout(()=>inp.focus(),250);
+    if(!K.items().length)setTimeout(()=>inp.focus(),250);
   });
 }
+const pickHall=(onPick,cur)=>pickFrom('hall',onPick,cur);
 function quickScore(){
   const h=hallById(db.settings.lastHallId);
   openSheet(`<h3>Endergebnis eintragen</h3>
@@ -523,12 +561,14 @@ function quickScore(){
       <div class="field"><span class="lbl">Halle</span><span class="val">${h?esc(h.name):'<span class="muted">bitte wählen</span>'}</span></div>
       <div class="field"><span class="lbl">Datum</span><span class="val">${fmtDate(startDate)}</span></div>
       <div class="field"><span class="lbl">Art</span><span class="val">${TYPE_LABEL[db.settings.lastType]}</span></div>
+      <div class="field"><span class="lbl">Ölbild</span><span class="val">${esc(oilName(db.settings.lastOil))}</span></div>
+      <div class="field"><span class="lbl">Ball</span><span class="val">${esc(ballName(db.settings.lastBallId))}</span></div>
     </div>
     <button class="btn primary big" id="qssave">Speichern</button>`,b=>{
     const inp=b.querySelector('#qs');setTimeout(()=>inp.focus(),250);
     b.querySelector('#qssave').onclick=()=>{
       const v=parseInt(inp.value,10);if(isNaN(v)||v<0||v>300){toast('Bitte 0 bis 300 eingeben');return}
-      const doSave=hid=>{db.games.push({id:uid(),date:startDate,hallId:hid,type:db.settings.lastType,frames:[],done:true,scoreOnly:v,created:Date.now(),finished:Date.now()});db.settings.lastHallId=hid;save();closeSheet();toast('Spiel gespeichert');render()};
+      const doSave=hid=>{db.games.push({id:uid(),date:startDate,hallId:hid,type:db.settings.lastType,ballId:ballById(db.settings.lastBallId)?db.settings.lastBallId:null,oil:db.settings.lastOil||null,frames:[],done:true,scoreOnly:v,created:Date.now(),finished:Date.now()});db.settings.lastHallId=hid;save();closeSheet();toast('Spiel gespeichert');render()};
       if(h)doSave(h.id);else pickHall(doSave);
     };
   });
@@ -550,6 +590,8 @@ function showGame(id){
       <label class="field"><span class="lbl">Halle</span><select id="gh">${halls.map(h=>`<option value="${h.id}" ${h.id===g.hallId?'selected':''}>${esc(h.name)}</option>`).join('')}${g.hallId?'':'<option selected value="">Ohne Halle</option>'}</select></label>
       <label class="field"><span class="lbl">Datum</span><input type="date" id="gd" value="${g.date}" max="${todayStr()}"></label>
       <div class="field"><span class="lbl">Art</span>${typeSeg(typeOf(g),'gameType" data-id="'+g.id)}</div>
+      <button class="field" style="width:100%" data-act="gamePick" data-kind="oil" data-id="${g.id}"><span class="lbl">Ölbild</span><span class="val ${g.oil?'':'muted'}">${esc(oilName(g.oil))}</span>${chev}</button>
+      <button class="field" style="width:100%" data-act="gamePick" data-kind="ball" data-id="${g.id}"><span class="lbl">Ball</span><span class="val ${ballById(g.ballId)?'':'muted'}">${esc(ballName(g.ballId))}</span>${chev}</button>
     </div>
     <button class="btn danger" id="gdel">Spiel löschen</button>`,b=>{
     b.querySelector('#gh').onchange=e=>{g.hallId=e.target.value||null;save();render()};
@@ -603,17 +645,21 @@ function filteredGames(){
   let gs=doneGames();
   if(statFilter.hall!=='all')gs=gs.filter(g=>g.hallId===statFilter.hall);
   if(statFilter.type!=='all')gs=gs.filter(g=>typeOf(g)===statFilter.type);
+  if(statFilter.ball!=='all')gs=gs.filter(g=>(g.ballId||'')===statFilter.ball);
+  if(statFilter.oil!=='all')gs=gs.filter(g=>(g.oil||'')===statFilter.oil);
   const days={'30':30,'90':90,'365':365}[statFilter.period];
   if(days){const d=new Date();d.setDate(d.getDate()-days+1);const c=dstr(d);gs=gs.filter(g=>g.date>=c)}
   return gs;
 }
 function renderStats(){
   charts=[];
-  const halls=hallsByUse().filter(h=>h.count);
+  const halls=hallsByUse().filter(h=>h.count),usedBalls=ballsByUse().filter(b=>b.count),usedOils=oilsList().filter(o=>o.count);
   const per=[['all','Alle'],['30','30 T'],['90','90 T'],['365','1 Jahr']];
   let html=`<div class="filters"><div class="seg">${per.map(([k,l])=>`<button class="${statFilter.period===k?'on':''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
     <div class="seg" style="min-width:0;flex:1 1 100%">${[['all','Alles'],['game','Nur Spiele'],['training','Nur Training']].map(([k,l])=>`<button class="${statFilter.type===k?'on':''}" data-act="statType" data-v="${k}">${l}</button>`).join('')}</div>
-    ${halls.length>1?`<select id="hallf"><option value="all">Alle Hallen</option>${halls.map(h=>`<option value="${h.id}" ${statFilter.hall===h.id?'selected':''}>${esc(h.name)}</option>`).join('')}</select>`:''}</div>`;
+    ${halls.length>1?`<select id="hallf"><option value="all">Alle Hallen</option>${halls.map(h=>`<option value="${h.id}" ${statFilter.hall===h.id?'selected':''}>${esc(h.name)}</option>`).join('')}</select>`:''}
+    ${usedBalls.length?`<select id="ballf"><option value="all">Alle Bälle</option>${usedBalls.map(b=>`<option value="${esc(b.id)}" ${statFilter.ball===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}<option value="" ${statFilter.ball===''?'selected':''}>Ball: keine Angabe</option></select>`:''}
+    ${usedOils.length?`<select id="oilf"><option value="all">Alle Ölbilder</option>${usedOils.map(o=>`<option value="${esc(o.id)}" ${statFilter.oil===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}<option value="" ${statFilter.oil===''?'selected':''}>Ölbild: keine Angabe</option></select>`:''}</div>`;
   const S=computeStats(filteredGames());
   if(!S.done.length){
     $('#main').innerHTML=html+'<div class="empty"><div class="big">📈</div>Noch keine abgeschlossenen Spiele in diesem Zeitraum.</div>';
@@ -643,7 +689,7 @@ function renderStats(){
     <div class="legend"><span><i style="background:var(--s1)"></i>Spiel</span><span><i class="line" style="background:var(--s2)"></i>Ø letzte 5 Spiele</span></div>
     <div class="chart" id="ch1"></div></div>`;
   charts.push(['ch1',{h:200,labels:S.done.map(g=>fmtShort(g.date)),series:[{kind:'dot',color:'var(--s1)',values:sc},{kind:'line',color:'var(--s2)',values:ma}],
-    tip:i=>`${fmtDate(S.done[i].date)}<br><b>${sc[i]}</b> Punkte${ma[i]!=null?' · Ø5 '+num(ma[i]):''}<br><span class="muted">${TYPE_LABEL[typeOf(S.done[i])]} · ${esc(hallName(S.done[i].hallId))}</span>`}]);
+    tip:i=>`${fmtDate(S.done[i].date)}<br><b>${sc[i]}</b> Punkte${ma[i]!=null?' · Ø5 '+num(ma[i]):''}<br><span class="muted">${TYPE_LABEL[typeOf(S.done[i])]} · ${esc(hallName(S.done[i].hallId))}${S.done[i].oil?' · '+esc(S.done[i].oil):''}${ballById(S.done[i].ballId)?' · '+esc(ballName(S.done[i].ballId)):''}</span>`}]);
 
   // Tagesschnitt
   const days=groupByDay(S.done).slice(-30);
@@ -676,12 +722,16 @@ function renderStats(){
         <div class="bar"><i style="width:${Math.round(L.ok/L.n*100)}%"></i></div></div></div>`).join('')}</div>`;
     }
   }
-  // Hallen
-  const hm=new Map();S.done.forEach(g=>{const k=g.hallId||'';if(!hm.has(k))hm.set(k,[]);hm.get(k).push(gameScore(g))});
-  if(hm.size>1||statFilter.hall==='all'){
-    html+=`<div class="card"><h2>Nach Halle</h2><table class="t"><tr><th>Halle</th><th class="n">Spiele</th><th class="n">Ø</th><th class="n">Bestes</th></tr>
-      ${[...hm.entries()].sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>`<tr><td>${esc(hallName(k))}</td><td class="n">${v.length}</td><td class="n">${num(avg(v))}</td><td class="n">${Math.max(...v)}</td></tr>`).join('')}</table></div>`;
-  }
+  // Hallen, Bälle, Ölbilder
+  const groupTable=(title,col,keyFn,nameFn)=>{
+    const m=new Map();S.done.forEach(g=>{const k=keyFn(g)||'';if(!m.has(k))m.set(k,[]);m.get(k).push(gameScore(g))});
+    if(m.size<2&&!(m.size===1&&[...m.keys()][0]))return '';
+    return `<div class="card"><h2>${title}</h2><table class="t"><tr><th>${col}</th><th class="n">Spiele</th><th class="n">Ø</th><th class="n">Bestes</th></tr>
+      ${[...m.entries()].sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>`<tr><td>${esc(nameFn(k))}</td><td class="n">${v.length}</td><td class="n">${num(avg(v))}</td><td class="n">${Math.max(...v)}</td></tr>`).join('')}</table></div>`;
+  };
+  html+=groupTable('Nach Halle','Halle',g=>g.hallId,hallName);
+  html+=groupTable('Nach Ball','Ball',g=>g.ballId,ballName);
+  html+=groupTable('Nach Ölbild','Ölbild',g=>g.oil,oilName);
   // Spiel vs. Training
   if(statFilter.type==='all'){
     const ty={game:[],training:[]};S.done.forEach(g=>ty[typeOf(g)].push(gameScore(g)));
@@ -703,7 +753,7 @@ function renderStats(){
   bindHallFilter();
   charts.forEach(([id,cfg])=>drawChart(document.getElementById(id),cfg));
 }
-function bindHallFilter(){const s=$('#hallf');if(s)s.onchange=e=>{statFilter.hall=e.target.value;renderStats()}}
+function bindHallFilter(){[['#hallf','hall'],['#ballf','ball'],['#oilf','oil']].forEach(([sel,k])=>{const s=$(sel);if(s)s.onchange=e=>{statFilter[k]=e.target.value;renderStats()}})}
 function pinPos(size){
   const s=size/4.2,pos={};
   ROWS.forEach((r,ri)=>r.forEach((p,j)=>{pos[p]=[size/2+(j-(r.length-1)/2)*s,s*0.62+ri*s*0.88]}));
@@ -766,7 +816,7 @@ function drawChart(el,cfg){
 
 /* ---------- Mehr ---------- */
 function renderMore(){
-  const halls=hallsByUse();
+  const halls=hallsByUse(),balls=ballsByUse();
   const lb=db.settings.lastBackup;const gcount=doneGames().length;
   const since=lb?Math.floor((Date.now()-lb)/864e5):null;
   $('#main').innerHTML=`<div class="card"><h2>Pins antippen</h2>
@@ -776,6 +826,12 @@ function renderMore(){
       ${halls.length?`<div class="list" style="margin-top:0">${halls.map(h=>`<div class="item"><span>${esc(h.name)}<br><span class="hint">${h.count} Spiele${h.last?' · zuletzt '+fmtDate(h.last,{day:'2-digit',month:'2-digit',year:'numeric'}):''}</span></span>
         <span class="row"><button class="btn small" data-act="renameHall" data-id="${h.id}">Umbenennen</button>${h.count?'':`<button class="btn small" style="color:var(--danger)" data-act="delHall" data-id="${h.id}">Löschen</button>`}</span></div>`).join('')}</div>`:'<p class="hint">Noch keine Hallen. Neue Hallen legst du beim Spielstart an.</p>'}
       <button class="btn" style="margin-top:10px" data-act="addHall">+ Halle hinzufügen</button></div>
+    <div class="card"><h2>Bälle<small>${balls.length}</small></h2>
+      ${balls.length?`<div class="list" style="margin-top:0">${balls.map(b=>`<div class="item"><span>${esc(b.name)}<br><span class="hint">${b.count} Spiele</span></span>
+        <span class="row"><button class="btn small" data-act="renameBall" data-id="${b.id}">Umbenennen</button>${b.count?'':`<button class="btn small" style="color:var(--danger)" data-act="delBall" data-id="${b.id}">Löschen</button>`}</span></div>`).join('')}</div>`:'<p class="hint">Noch keine Bälle. Neue Bälle legst du beim Spielstart an oder hier.</p>'}
+      <button class="btn" style="margin-top:10px" data-act="addBall">+ Ball hinzufügen</button></div>
+    <div class="card"><h2>Eigene Ölbilder<small>${db.oils.length}</small></h2>
+      ${db.oils.length?`<div class="list" style="margin-top:0">${db.oils.map(o=>`<div class="item"><span>${esc(o.name)}</span>${usage('oil').cnt[o.name]?`<span class="hint">${usage('oil').cnt[o.name]} Spiele</span>`:`<button class="btn small" style="color:var(--danger)" data-act="delOil" data-id="${o.id}">Löschen</button>`}</div>`).join('')}</div>`:'<p class="hint">Die gängigen Ölbilder sind schon vorausgewählt. Fehlt eins, tippst du es beim Spielstart unter „Ölbild“ einfach ein.</p>'}</div>
     <div class="card"><h2>Datensicherung</h2>
       <p class="hint" style="margin-top:-4px">Deine Daten liegen nur auf diesem iPhone. ${lb?`Letzte Sicherung vor ${since===0?'weniger als einem Tag':since+' '+(since===1?'Tag':'Tagen')}.`:'Bisher keine Sicherung.'} Sichere regelmäßig, z. B. in „Dateien“ oder iCloud Drive.</p>
       <div class="stack"><button class="btn primary" data-act="export">Backup speichern</button>
@@ -787,7 +843,7 @@ function renderMore(){
       <li>Ab dann nur noch über das Icon starten. Die App funktioniert auch ohne Internet.</li></ol>
       <p class="hint">Wichtig: Safari und die Home-Bildschirm-App haben getrennte Speicher. Spiele, die du vorher in Safari erfasst hast, holst du per Backup rüber.</p></div>
     <button class="btn danger" data-act="wipe">Alle Daten löschen</button>
-    <p class="hint" style="text-align:center">${db.games.length} Spiele gespeichert · Bowling Tracker 1.1</p>`;
+    <p class="hint" style="text-align:center">${db.games.length} Spiele gespeichert · Bowling Tracker 1.2</p>`;
   $('#importFile').onchange=importFile;
 }
 async function shareOrDownload(text,name,type){
@@ -803,9 +859,9 @@ async function exportBackup(){
   if(ok){db.settings.lastBackup=Date.now();save();render();toast('Backup erstellt')}
 }
 function exportCsv(){
-  const rows=[['Datum','Halle','Art','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
+  const rows=[['Datum','Halle','Art','Ölbild','Ball','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
   sortedGames(doneGames()).forEach(g=>{const s=computeStats([g]);
-    rows.push([g.date,hallName(g.hallId),TYPE_LABEL[typeOf(g)],gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
+    rows.push([g.date,hallName(g.hallId),TYPE_LABEL[typeOf(g)],g.oil||'',ballById(g.ballId)?.name||'',gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
   const csv='﻿'+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n');
   shareOrDownload(csv,'bowling-spiele-'+todayStr()+'.csv','text/csv');
 }
@@ -821,11 +877,12 @@ function importFile(e){
       b.querySelector('#imMerge').onclick=()=>{
         const hids=new Set(db.halls.map(h=>h.id)),gids=new Set(db.games.map(g=>g.id));let n=0;
         data.halls.forEach(h=>{if(!hids.has(h.id))db.halls.push(h)});
+        ['balls','oils'].forEach(k=>{const ids=new Set(db[k].map(x=>x.id));(data[k]||[]).forEach(x=>{if(!ids.has(x.id))db[k].push(x)})});
         data.games.forEach(g=>{if(!gids.has(g.id)){db.games.push(g);n++}});
         save();closeSheet();toast(n+' Spiele übernommen');render();
       };
       b.querySelector('#imReplace').onclick=async()=>{if(!await ask('Alle aktuellen Daten durch das Backup ersetzen?','Ersetzen'))return;
-        db=Object.assign(emptyDb(),data);db.settings=Object.assign(emptyDb().settings,data.settings||{});save();closeSheet();toast('Backup wiederhergestellt');render()};
+        db=Object.assign(emptyDb(),data);db.balls=db.balls||[];db.oils=db.oils||[];db.settings=Object.assign(emptyDb().settings,data.settings||{});save();closeSheet();toast('Backup wiederhergestellt');render()};
     });
   };
   r.readAsText(f);e.target.value='';
@@ -838,11 +895,13 @@ const actions={
   all(){const g=activeGame();addRoll(g,state(g).standing);afterRoll(g)},
   gutter(){const g=activeGame();addRoll(g,[]);afterRoll(g)},
   undo(){const g=activeGame();undoRoll(g);sel.clear();render()},
-  async abort(){const g=activeGame();if(!g)return;if(rollCount(g)&&!await ask('Laufendes Spiel verwerfen?','Spiel verwerfen'))return;db.games=db.games.filter(x=>x.id!==g.id);save();sel.clear();render()},
+  async abort(){const g=activeGame();if(!g)return;if(rollCount(g)&&!await ask('Laufendes Spiel abbrechen? Die bisherigen Würfe werden gelöscht.','Spiel abbrechen'))return;db.games=db.games.filter(x=>x.id!==g.id);save();sel.clear();render();toast('Spiel abgebrochen')},
   pickHall(){pickHall(id=>{db.settings.lastHallId=id;save();render()},db.settings.lastHallId)},
   newGame(){const h=hallById(db.settings.lastHallId);if(h)startGame(h.id,startDate);else pickHall(id=>startGame(id,startDate))},
   quickScore,
-  nextGame(el){const g=db.games.find(x=>x.id===el.dataset.id);startGame(g?.hallId,g?.date,g&&typeOf(g))},
+  nextGame(el){const g=db.games.find(x=>x.id===el.dataset.id);startGame(g?.hallId,g?.date,g&&typeOf(g),g?.ballId||null,g?.oil||null)},
+  pick(el){const k=el.dataset.kind;const key=k==='ball'?'lastBallId':'lastOil';pickFrom(k,v=>{db.settings[key]=v;save();render()},db.settings[key])},
+  gamePick(el){const g=db.games.find(x=>x.id===el.dataset.id);if(!g)return;const k=el.dataset.kind,f=k==='ball'?'ballId':'oil';pickFrom(k,v=>{g[f]=v;save();render();showGame(g.id)},g[f])},
   setType(el){db.settings.lastType=el.dataset.v;save();render()},
   gameType(el){const g=db.games.find(x=>x.id===el.dataset.id);if(!g)return;g.type=el.dataset.v;save();el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));render()},
   statType(el){statFilter.type=el.dataset.v;renderStats()},
@@ -856,6 +915,10 @@ const actions={
   async renameHall(el){const h=hallById(el.dataset.id);const n=await askText('Halle umbenennen',h.name);if(n&&n.trim()){h.name=n.trim();save();render()}},
   async delHall(el){const h=hallById(el.dataset.id);if(await ask('Halle „'+h.name+'“ löschen?','Halle löschen')){db.halls=db.halls.filter(x=>x.id!==h.id);if(db.settings.lastHallId===h.id)db.settings.lastHallId=null;save();render()}},
   async addHall(){const n=await askText('Name der Bowlinghalle','');if(!n||!n.trim())return;if(db.halls.some(h=>h.name.toLowerCase()===n.trim().toLowerCase())){toast('Diese Halle gibt es schon');return}db.halls.push({id:uid(),name:n.trim(),created:Date.now()});save();render()},
+  async renameBall(el){const b=ballById(el.dataset.id);const n=await askText('Ball umbenennen',b.name);if(n){b.name=n;save();render()}},
+  async delBall(el){const b=ballById(el.dataset.id);if(await ask('Ball „'+b.name+'“ löschen?','Ball löschen')){db.balls=db.balls.filter(x=>x.id!==b.id);if(db.settings.lastBallId===b.id)db.settings.lastBallId=null;save();render()}},
+  async addBall(){const n=await askText('Name des Balls','');if(!n)return;if(db.balls.some(b=>b.name.toLowerCase()===n.toLowerCase())){toast('Diesen Ball gibt es schon');return}db.balls.push({id:uid(),name:n,created:Date.now()});save();render()},
+  delOil(el){const o=db.oils.find(x=>x.id===el.dataset.id);db.oils=db.oils.filter(x=>x.id!==el.dataset.id);if(o&&db.settings.lastOil===o.name)db.settings.lastOil=null;save();render()},
   export:exportBackup,csv:exportCsv,
   import(){$('#importFile').click()},
   async wipe(){if(await ask('Wirklich ALLE Spiele und Hallen löschen? Das lässt sich nicht rückgängig machen.','Alles löschen')){db=emptyDb();save();finishedId=null;render();toast('Alle Daten gelöscht')}},
