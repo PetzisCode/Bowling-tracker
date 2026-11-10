@@ -18,7 +18,7 @@
   color-scheme:light;
   --bg:#f4f4f2;--surface:#ffffff;--surface-2:#ecebe8;--text:#0b0b0b;--text-2:#52514e;--muted:#8a8984;
   --border:#e0dfdb;--accent:#2a78d6;--accent-ink:#ffffff;--accent-soft:#dbe9fb;
-  --s1:#2a78d6;--s2:#eb6834;--danger:#c62828;--pin-ring:#d83a3a;--pin-face:#ffffff;--pin-edge:#cfcdc8;
+  --s1:#2a78d6;--s2:#eb6834;--danger:#c62828;--good:#2e8540;--warn:#d48a00;--pin-ring:#d83a3a;--pin-face:#ffffff;--pin-edge:#cfcdc8;
   --special:#1f2a37;--special-ink:#ffffff;
 }
 @media (prefers-color-scheme: dark){
@@ -26,7 +26,7 @@
     color-scheme:dark;
     --bg:#0f0f0f;--surface:#1a1a19;--surface-2:#262624;--text:#f0efec;--text-2:#c3c2b7;--muted:#8d8c85;
     --border:#2f2e2b;--accent:#3987e5;--accent-ink:#ffffff;--accent-soft:#16304f;
-    --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--pin-face:#f3f2ee;--pin-edge:#5a5955;
+    --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--good:#4caf50;--warn:#e0a020;--pin-face:#f3f2ee;--pin-edge:#5a5955;
     --special:#e9e7e1;--special-ink:#111111;
   }
 }
@@ -34,7 +34,7 @@
   color-scheme:dark;
   --bg:#0f0f0f;--surface:#1a1a19;--surface-2:#262624;--text:#f0efec;--text-2:#c3c2b7;--muted:#8d8c85;
   --border:#2f2e2b;--accent:#3987e5;--accent-ink:#ffffff;--accent-soft:#16304f;
-  --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--pin-face:#f3f2ee;--pin-edge:#5a5955;
+  --s1:#3987e5;--s2:#d95926;--danger:#ef5350;--good:#4caf50;--warn:#e0a020;--pin-face:#f3f2ee;--pin-edge:#5a5955;
   --special:#e9e7e1;--special-ink:#111111;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -382,7 +382,7 @@ function computeStats(games){
   opp.forEach(r=>{
     const st=PINS.filter(p=>!r.first.includes(p));const key=st.join('-');
     const ok=r.first.length+r.second.length===10;
-    const L=leaves.get(key)||{pins:st,n:0,ok:0};L.n++;if(ok)L.ok++;leaves.set(key,L);
+    const L=leaves.get(key)||{pins:st,n:0,ok:0,hit:0,split:isSplit(r.first)};L.n++;L.hit+=r.second.length;if(ok)L.ok++;leaves.set(key,L);
     if(isSplit(r.first)){splits++;if(ok)splitConv++}
     if(st.length===1){single++;if(ok)singleConv++}
     if(!ok)st.forEach(p=>{if(!r.second.includes(p))left[p]++});
@@ -394,7 +394,7 @@ function computeStats(games){
 
 /* ---------- UI-Grundgerüst ---------- */
 let tab='play',sel=new Set(),finishedId=null,startDate=todayStr();
-let statFilter={period:'all',hall:'all',type:'all',ball:'all',oil:'all'};
+let statFilter={period:'all',hall:'all',type:'all',ball:'all',oil:'all'},statView='overview',leaveSort='n';
 let calMonth=todayStr().slice(0,7),openDay=null;
 const TITLES={play:'Spielen',history:'Verlauf',stats:'Statistik',more:'Mehr'};
 const chev='<svg class="chev" width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l6 6-6 6"/></svg>';
@@ -668,7 +668,8 @@ function renderStats(){
   charts=[];
   const halls=hallsByUse().filter(h=>h.count),usedBalls=ballsByUse().filter(b=>b.count),usedOils=oilsList().filter(o=>o.count);
   const per=[['all','Alle'],['30','30 T'],['90','90 T'],['365','1 Jahr']];
-  let html=`<div class="filters"><div class="seg">${per.map(([k,l])=>`<button class="${statFilter.period===k?'on':''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
+  let html=`<div class="seg" style="margin-bottom:10px">${[['overview','Überblick'],['spares','Spares'],['splits','Splits']].map(([k,l])=>`<button class="${statView===k?'on':''}" data-act="statView" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="filters"><div class="seg">${per.map(([k,l])=>`<button class="${statFilter.period===k?'on':''}" data-act="period" data-v="${k}">${l}</button>`).join('')}</div>
     <div class="seg" style="min-width:0;flex:1 1 100%">${[['all','Alles'],['game','Nur Spiele'],['training','Nur Training']].map(([k,l])=>`<button class="${statFilter.type===k?'on':''}" data-act="statType" data-v="${k}">${l}</button>`).join('')}</div>
     ${halls.length>1?`<select id="hallf"><option value="all">Alle Hallen</option>${halls.map(h=>`<option value="${h.id}" ${statFilter.hall===h.id?'selected':''}>${esc(h.name)}</option>`).join('')}</select>`:''}
     ${usedBalls.length?`<select id="ballf"><option value="all">Alle Bälle</option>${usedBalls.map(b=>`<option value="${esc(b.id)}" ${statFilter.ball===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}<option value="" ${statFilter.ball===''?'selected':''}>Ball: keine Angabe</option></select>`:''}
@@ -678,6 +679,7 @@ function renderStats(){
     $('#main').innerHTML=html+'<div class="empty"><div class="big">📈</div>Noch keine abgeschlossenen Spiele in diesem Zeitraum.</div>';
     bindHallFilter();return;
   }
+  if(statView!=='overview'){$('#main').innerHTML=html+leaveTabHtml(S,statView==='splits');bindHallFilter();return}
   const R=S.R.length;
   html+=`<div class="card"><h2>Überblick<small>${S.done.length} Spiele</small></h2><div class="kpis">
     <div class="kpi"><b>${num(avg(S.scores))}</b><span>Schnitt</span></div>
@@ -782,6 +784,39 @@ function renderStats(){
   $('#main').innerHTML=html;
   bindHallFilter();
   charts.forEach(([id,cfg])=>drawChart(document.getElementById(id),cfg));
+}
+/* Spares-/Splits-Tab: jedes Restbild nach dem 1. Wurf mit Häufigkeit und Räumquote */
+function leaveTabHtml(S,splits){
+  const all=S.leaves.filter(L=>L.split===splits);
+  const n=sum(all.map(L=>L.n)),ok=sum(all.map(L=>L.ok)),R=S.R.length;
+  const what=splits?'Splits':'Spares';
+  if(!n)return `<div class="empty"><div class="big">🎳</div>${splits?'Noch keine Splits':'Noch keine Spare-Chancen'} in den vollständig erfassten Spielen dieses Zeitraums.</div>`;
+  let h=`<div class="card"><h2>${splits?'Split-Übersicht':'Spare-Übersicht'}<small>${n} ${splits?'Splits':'Versuche'}</small></h2><div class="kpis">
+    <div class="kpi"><b>${pct(ok,n)}</b><span>${splits?'Splits geräumt':'Spare-Quote'}</span></div>`;
+  if(splits){
+    h+=`<div class="kpi"><b>${pct(n,R)}</b><span>Anteil 1. Würfe</span></div>
+      <div class="kpi"><b>${num(sum(all.map(L=>L.hit))/n,1)}</b><span>Ø Pins im 2. Wurf</span></div>`;
+  }else{
+    const one=all.filter(L=>L.pins.length===1),more=all.filter(L=>L.pins.length>1);
+    const q=a=>pct(sum(a.map(L=>L.ok)),sum(a.map(L=>L.n)));
+    h+=`<div class="kpi"><b>${q(one)}</b><span>Einzelpins</span></div><div class="kpi"><b>${q(more)}</b><span>Mehrere Pins</span></div>`;
+  }
+  h+=`</div><p class="hint" style="margin:8px 0 0">${splits?'Nur Restbilder, die als Split zählen (Kopfpin weg, stehende Pins nicht zusammenhängend).':'Ohne Splits – die haben ihren eigenen Tab.'} ${S.tracked.length<S.done.length?`Aus ${S.tracked.length} vollständig erfassten Spielen.`:''}</p></div>`;
+  const list=all.slice();
+  if(leaveSort==='q')list.sort((a,b)=>a.ok/a.n-b.ok/b.n||b.n-a.n);
+  h+=`<div class="card"><h2>Alle Restbilder<small>${list.length}</small></h2>
+    <div class="seg" style="margin-bottom:6px">${[['n','Häufigste'],['q','Schwächste Quote']].map(([k,l])=>`<button class="${leaveSort===k?'on':''}" data-act="leaveSort" data-v="${k}">${l}</button>`).join('')}</div>
+    ${list.map(L=>{const q=Math.round(L.ok/L.n*100);return `<div class="leave">${pinPic(L.pins)}
+      <div style="flex:1;min-width:0"><div class="row between"><span class="nm">${L.pins.join('-')}</span><b style="font-variant-numeric:tabular-nums">${q} %</b></div>
+      <div class="hint">${L.n}× gehabt · ${L.ok}× geräumt${splits?` · Ø ${num(L.hit/L.n,1)} Pins`:''}</div>
+      <div class="bar"><i style="width:${q}%;background:${q>=70?'var(--good)':q>=40?'var(--warn)':'var(--danger)'}"></i></div></div></div>`}).join('')}
+    <p class="hint" style="margin:8px 0 0">Gefüllt = stehende Pins nach dem 1. Wurf. ${leaveSort==='q'?'Oben stehen die Bilder, die du am seltensten räumst – gut fürs Training.':''}</p></div>`;
+  return h;
+}
+function pinPic(standing){
+  const size=76,{pos,s,h}=pinPos(size);
+  return `<svg width="${size}" height="${h}" viewBox="0 0 ${size} ${h}" style="flex:none" role="img" aria-label="Stehende Pins ${standing.join(', ')}">${PINS.map(p=>{const[x,y]=pos[p];const on=standing.includes(p);
+    return `<circle cx="${x}" cy="${y}" r="${s*0.4}" fill="${on?'var(--s1)':'none'}" stroke="${on?'var(--s1)':'var(--border)'}" stroke-width="1.5"/>${on?`<text x="${x}" y="${y+s*0.14}" text-anchor="middle" font-size="${s*0.4}" font-weight="700" fill="#fff">${p}</text>`:''}`}).join('')}</svg>`;
 }
 function bindHallFilter(){[['#hallf','hall'],['#ballf','ball'],['#oilf','oil']].forEach(([sel,k])=>{const s=$(sel);if(s)s.onchange=e=>{statFilter[k]=e.target.value;renderStats()}})}
 function pinPos(size){
@@ -935,6 +970,8 @@ const actions={
   setType(el){db.settings.lastType=el.dataset.v;save();render()},
   gameType(el){const g=db.games.find(x=>x.id===el.dataset.id);if(!g)return;g.type=el.dataset.v;save();el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));render()},
   statType(el){statFilter.type=el.dataset.v;renderStats()},
+  statView(el){statView=el.dataset.v;window.scrollTo(0,0);renderStats()},
+  leaveSort(el){leaveSort=el.dataset.v;renderStats()},
   doneFinished(){finishedId=null;render()},
   undoFinished(el){const g=db.games.find(x=>x.id===el.dataset.id);if(g){undoRoll(g);finishedId=null;sel.clear();render()}},
   game(el){showGame(el.dataset.id)},
