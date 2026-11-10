@@ -121,11 +121,11 @@ nav.tabs button.on{color:var(--accent)}
 .actions .wide{grid-column:1/-1}
 .lrbar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:10px;background:var(--surface-2)}
 .lrbar i{display:block;height:100%}
-.strikesplit{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-.strikesplit .btn{flex-direction:column;gap:0;line-height:1.05;padding:0 4px}
-.strikesplit .btn:first-child{border-radius:14px 6px 6px 14px}
-.strikesplit .btn:last-child{border-radius:6px 14px 14px 6px}
-.strikesplit .btn small{font-size:13px;font-weight:600;opacity:.85}
+.strikesplit{position:relative;display:grid;grid-template-columns:1fr 1fr;border-radius:14px;overflow:hidden;background:var(--special);color:var(--special-ink)}
+.strikesplit button{min-height:64px;background:transparent;color:inherit}
+.strikesplit button:active{background:rgba(255,255,255,.14)}
+.strikesplit::after{content:'';position:absolute;left:50%;top:10px;bottom:10px;width:1px;background:linear-gradient(currentColor 0 30%,transparent 30% 70%,currentColor 70%);opacity:.3;pointer-events:none}
+.strikesplit .lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:650;font-size:24px;pointer-events:none}
 .gamebar{display:flex;justify-content:space-between;align-items:center;margin:0 2px 6px;gap:8px}
 body.ingame header.top{display:none}
 body.ingame main{padding-top:calc(env(safe-area-inset-top) + 10px)}
@@ -492,7 +492,7 @@ function renderGame(g){
       const c=!st.standing.includes(p)?'down':sel.has(p)?'on':'';
       return `<button class="pin ${c}" data-act="pin" data-p="${p}" aria-label="Pin ${p}">${p}</button>`}).join('')}</div>`).join('')}</div>
   <div class="actions">
-    ${fresh?`<div class="strikesplit"><button class="btn special big" data-act="all" data-side="L" aria-label="Strike links">X<small>links</small></button><button class="btn special big" data-act="all" data-side="R" aria-label="Strike rechts">X<small>rechts</small></button></div>`
+    ${fresh?`<div class="strikesplit"><button data-act="all" data-side="L" aria-label="Strike links"></button><button data-act="all" data-side="R" aria-label="Strike rechts"></button><span class="lbl">X</span></div>`
       :'<button class="btn special big" data-act="all">/&nbsp; Spare</button>'}
     <button class="btn big" data-act="gutter">0&nbsp; ${fresh?'Rinne':'Daneben'}</button>
     <button class="btn primary big wide" data-act="commit">Wurf speichern · ${count} ${count===1?'Pin':'Pins'}</button>
