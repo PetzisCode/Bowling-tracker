@@ -119,6 +119,13 @@ nav.tabs button.on{color:var(--accent)}
 .prompt b{font-size:17px}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 .actions .wide{grid-column:1/-1}
+.lrbar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:10px;background:var(--surface-2)}
+.lrbar i{display:block;height:100%}
+.strikesplit{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.strikesplit .btn{flex-direction:column;gap:0;line-height:1.05;padding:0 4px}
+.strikesplit .btn:first-child{border-radius:14px 6px 6px 14px}
+.strikesplit .btn:last-child{border-radius:6px 14px 14px 6px}
+.strikesplit .btn small{font-size:13px;font-weight:600;opacity:.85}
 .gamebar{display:flex;justify-content:space-between;align-items:center;margin:0 2px 6px;gap:8px}
 body.ingame header.top{display:none}
 body.ingame main{padding-top:calc(env(safe-area-inset-top) + 10px)}
@@ -242,15 +249,16 @@ function state(g){
   if(done) return {done:true};
   return {fi:9,ri:n,standing:rack,fresh};
 }
-function addRoll(g,knocked){
+function addRoll(g,knocked,side){
   const st=state(g);if(st.done)return;
   (g.frames[st.fi]=g.frames[st.fi]||[]).push(knocked.slice().sort((a,b)=>a-b));
+  if(side==='L'||side==='R'){g.sides=g.sides||{};g.sides[st.fi+'.'+(g.frames[st.fi].length-1)]=side}
   if(state(g).done){g.done=true;g.finished=Date.now()}
   save();
 }
 function undoRoll(g){
   for(let i=g.frames.length-1;i>=0;i--){
-    if(g.frames[i]&&g.frames[i].length){g.frames[i].pop();if(!g.frames[i].length)g.frames.length=i;g.done=false;delete g.finished;save();return true}
+    if(g.frames[i]&&g.frames[i].length){if(g.sides)delete g.sides[i+'.'+(g.frames[i].length-1)];g.frames[i].pop();if(!g.frames[i].length)g.frames.length=i;g.done=false;delete g.finished;save();return true}
   }
   return false;
 }
@@ -302,15 +310,18 @@ function racks(g){
   const out=[];
   g.frames.forEach((fr,i)=>{
     if(!fr||!fr.length)return;
-    if(i<9){out.push({first:fr[0],second:fr[0].length<10?fr[1]:undefined});return}
+    if(i<9){out.push({first:fr[0],second:fr[0].length<10?fr[1]:undefined,side:sideOf(g,i,0)});return}
     let rack=PINS.slice(),fresh=true,cur=null;
-    for(const r of fr){
-      if(fresh){cur={first:r};out.push(cur)}else if(cur&&cur.second===undefined)cur.second=r;
+    fr.forEach((r,j)=>{
+      if(fresh){cur={first:r,side:sideOf(g,i,j)};out.push(cur)}else if(cur&&cur.second===undefined)cur.second=r;
       rack=rack.filter(p=>!r.includes(p));fresh=false;if(!rack.length){rack=PINS.slice();fresh=true}
-    }
+    });
   });
   return out;
 }
+/* Strike-Seite (L/R) je Wurf; ältere Spiele haben keine Angabe -> null = unbekannt */
+function sideOf(g,fi,ri){const s=g.sides&&g.sides[fi+'.'+ri];return s==='L'||s==='R'?s:null}
+function sideText(s){const p=[];if(s.strikeL)p.push(s.strikeL+'× links');if(s.strikeR)p.push(s.strikeR+'× rechts');if(s.strikeU&&p.length)p.push(s.strikeU+'× ohne Angabe');return p.join(' · ')}
 
 /* ---------- Daten-Helfer ---------- */
 const typeOf=g=>g.type==='training'?'training':'game';
@@ -361,7 +372,8 @@ function computeStats(games){
   const scores=done.map(gameScore);
   const tracked=done.filter(g=>g.scoreOnly==null);
   const R=[];tracked.forEach(g=>R.push(...racks(g)));
-  const strikes=R.filter(r=>r.first.length===10).length;
+  const SR=R.filter(r=>r.first.length===10),strikes=SR.length;
+  const strikeL=SR.filter(r=>r.side==='L').length,strikeR=SR.filter(r=>r.side==='R').length,strikeU=strikes-strikeL-strikeR;
   const opp=R.filter(r=>r.first.length<10&&r.second);
   const conv=opp.filter(r=>r.first.length+r.second.length===10);
   const stand={},left={};PINS.forEach(p=>{stand[p]=0;left[p]=0});
@@ -376,7 +388,7 @@ function computeStats(games){
     if(!ok)st.forEach(p=>{if(!r.second.includes(p))left[p]++});
   });
   const open=opp.length-conv.length;
-  return {done,scores,tracked,R,strikes,opp,conv,stand,left,leaves:[...leaves.values()].sort((a,b)=>b.n-a.n||a.pins.length-b.pins.length),
+  return {done,scores,tracked,R,strikes,strikeL,strikeR,strikeU,opp,conv,stand,left,leaves:[...leaves.values()].sort((a,b)=>b.n-a.n||a.pins.length-b.pins.length),
     splits,splitConv,single,singleConv,open,firstAvg:avg(R.map(r=>r.first.length))};
 }
 
@@ -480,7 +492,8 @@ function renderGame(g){
       const c=!st.standing.includes(p)?'down':sel.has(p)?'on':'';
       return `<button class="pin ${c}" data-act="pin" data-p="${p}" aria-label="Pin ${p}">${p}</button>`}).join('')}</div>`).join('')}</div>
   <div class="actions">
-    <button class="btn special big" data-act="all">${fresh?'X&nbsp; Strike':'/&nbsp; Spare'}</button>
+    ${fresh?`<div class="strikesplit"><button class="btn special big" data-act="all" data-side="L" aria-label="Strike links">X<small>links</small></button><button class="btn special big" data-act="all" data-side="R" aria-label="Strike rechts">X<small>rechts</small></button></div>`
+      :'<button class="btn special big" data-act="all">/&nbsp; Spare</button>'}
     <button class="btn big" data-act="gutter">0&nbsp; ${fresh?'Rinne':'Daneben'}</button>
     <button class="btn primary big wide" data-act="commit">Wurf speichern · ${count} ${count===1?'Pin':'Pins'}</button>
   </div>`;
@@ -505,7 +518,7 @@ function renderFinished(g){
       <div class="kpi"><b>${s.strikes}</b><span>Strikes</span></div>
       <div class="kpi"><b>${s.conv.length}/${s.opp.length}</b><span>Spares</span></div>
       <div class="kpi"><b>${num(day?.avg)}</b><span>Ø heute (${day?.count||0})</span></div>
-    </div></div>
+    </div>${sideText(s)?`<p class="hint" style="margin:8px 0 0;text-align:center">Strikes: ${sideText(s)}</p>`:''}</div>
   <div class="stack">
     <button class="btn primary big" data-act="nextGame" data-id="${g.id}">${typeOf(g)==='training'?'Nächstes Training':'Nächstes Spiel'}</button>
     <button class="btn" data-act="doneFinished">Fertig</button>
@@ -585,7 +598,7 @@ function showGame(id){
     ${g.scoreOnly==null?scorecardHtml(g)+`<div class="kpis" style="margin-top:10px">
       <div class="kpi"><b>${s.strikes}</b><span>Strikes</span></div>
       <div class="kpi"><b>${s.conv.length}/${s.opp.length}</b><span>Spares</span></div>
-      <div class="kpi"><b>${pinsKnocked(g)}</b><span>Pins umgeworfen</span></div></div>`:''}
+      <div class="kpi"><b>${pinsKnocked(g)}</b><span>Pins umgeworfen</span></div></div>${sideText(s)?`<p class="hint" style="margin:8px 0 0;text-align:center">Strikes: ${sideText(s)}</p>`:''}`:''}
     <div class="card" style="padding:4px 14px;margin-top:12px">
       <label class="field"><span class="lbl">Halle</span><select id="gh">${halls.map(h=>`<option value="${h.id}" ${h.id===g.hallId?'selected':''}>${esc(h.name)}</option>`).join('')}${g.hallId?'':'<option selected value="">Ohne Halle</option>'}</select></label>
       <label class="field"><span class="lbl">Datum</span><input type="date" id="gd" value="${g.date}" max="${todayStr()}"></label>
@@ -677,6 +690,23 @@ function renderStats(){
     <div class="kpi"><b>${pct(S.splits,R)}</b><span>Splits (1. Wurf)</span></div>
     <div class="kpi"><b>${pct(S.open,R)}</b><span>Offene Frames</span></div>
   </div>${S.tracked.length<S.done.length?`<p class="hint" style="margin:8px 0 0">Wurf-Werte aus ${S.tracked.length} vollständig erfassten Spielen.</p>`:''}</div>`;
+
+  // Strikes links/rechts
+  if(S.strikes){
+    const known=S.strikeL+S.strikeR;
+    let sh=`<div class="card"><h2>Strikes links / rechts<small>${S.strikes} Strikes</small></h2><div class="kpis">
+      <div class="kpi"><b>${S.strikeL}</b><span>Links${known?' · '+pct(S.strikeL,known):''}</span></div>
+      <div class="kpi"><b>${S.strikeR}</b><span>Rechts${known?' · '+pct(S.strikeR,known):''}</span></div>
+      <div class="kpi"><b>${S.strikeU}</b><span>Ohne Angabe</span></div></div>`;
+    if(known){
+      sh+=`<div class="lrbar"><i style="width:${S.strikeL/known*100}%;background:var(--s1)"></i><i style="width:${S.strikeR/known*100}%;background:var(--s2)"></i></div>`;
+      const m=new Map();S.tracked.forEach(g=>{const c=computeStats([g]);if(!c.strikeL&&!c.strikeR)return;const k=g.ballId||'';const v=m.get(k)||{L:0,R:0};v.L+=c.strikeL;v.R+=c.strikeR;m.set(k,v)});
+      if(m.size>1||(m.size===1&&[...m.keys()][0]))sh+=`<table class="t" style="margin-top:10px"><tr><th>Ball</th><th class="n">Links</th><th class="n">Rechts</th></tr>
+        ${[...m.entries()].sort((x,y)=>(y[1].L+y[1].R)-(x[1].L+x[1].R)).map(([k,v])=>`<tr><td>${esc(ballName(k))}</td><td class="n">${v.L}</td><td class="n">${v.R}</td></tr>`).join('')}</table>`;
+    }
+    sh+=`<p class="hint" style="margin:8px 0 0">${S.strikeU?'„Ohne Angabe“ sind ältere Strikes von vor der Links/Rechts-Erfassung oder per Pin-Auswahl gespeicherte. ':''}Prozente beziehen sich auf Strikes mit Seitenangabe.</p></div>`;
+    html+=sh;
+  }
 
   // Punkteverlauf
   const sc=S.scores,ma=sc.map((_,i)=>i<2?null:avg(sc.slice(Math.max(0,i-4),i+1)));
@@ -859,9 +889,9 @@ async function exportBackup(){
   if(ok){db.settings.lastBackup=Date.now();save();render();toast('Backup erstellt')}
 }
 function exportCsv(){
-  const rows=[['Datum','Halle','Art','Ölbild','Ball','Spiel des Tages','Punkte','Strikes','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
+  const rows=[['Datum','Halle','Art','Ölbild','Ball','Spiel des Tages','Punkte','Strikes','Strikes links','Strikes rechts','Spares','Spare-Versuche','Pins umgeworfen','Nur Ergebnis']];
   sortedGames(doneGames()).forEach(g=>{const s=computeStats([g]);
-    rows.push([g.date,hallName(g.hallId),TYPE_LABEL[typeOf(g)],g.oil||'',ballById(g.ballId)?.name||'',gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
+    rows.push([g.date,hallName(g.hallId),TYPE_LABEL[typeOf(g)],g.oil||'',ballById(g.ballId)?.name||'',gameNoOfDay(g),gameScore(g),g.scoreOnly!=null?'':s.strikes,g.scoreOnly!=null?'':s.strikeL,g.scoreOnly!=null?'':s.strikeR,g.scoreOnly!=null?'':s.conv.length,g.scoreOnly!=null?'':s.opp.length,pinsKnocked(g)??'',g.scoreOnly!=null?'ja':'nein'])});
   const csv='﻿'+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n');
   shareOrDownload(csv,'bowling-spiele-'+todayStr()+'.csv','text/csv');
 }
@@ -892,7 +922,7 @@ function importFile(e){
 const actions={
   pin(el){const p=+el.dataset.p;sel.has(p)?sel.delete(p):sel.add(p);renderGame(activeGame())},
   commit(){const g=activeGame(),st=state(g);const kn=db.settings.tapMode==='hit'?[...sel]:st.standing.filter(p=>!sel.has(p));addRoll(g,kn);afterRoll(g)},
-  all(){const g=activeGame();addRoll(g,state(g).standing);afterRoll(g)},
+  all(el){const g=activeGame(),st=state(g);addRoll(g,st.standing,st.fresh?el.dataset.side:null);afterRoll(g)},
   gutter(){const g=activeGame();addRoll(g,[]);afterRoll(g)},
   undo(){const g=activeGame();undoRoll(g);sel.clear();render()},
   async abort(){const g=activeGame();if(!g)return;if(rollCount(g)&&!await ask('Laufendes Spiel abbrechen? Die bisherigen Würfe werden gelöscht.','Spiel abbrechen'))return;db.games=db.games.filter(x=>x.id!==g.id);save();sel.clear();render();toast('Spiel abgebrochen')},
